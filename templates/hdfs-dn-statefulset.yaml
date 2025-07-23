@@ -1,25 +1,29 @@
+# DataNode的StatefulSet配置，管理HDFS数据节点的生命周期（有状态，需稳定存储和网络标识）
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "hadoop.fullname" . }}-hdfs-dn
+  name: {{ include "hadoop.fullname" . }}-hdfs-dn  # 唯一名称
   annotations:
+    # 配置文件哈希值，用于检测配置变更触发滚动更新
     checksum/config: {{ include (print $.Template.BasePath "/hadoop-configmap.yaml") . | sha256sum }}
   labels:
     app.kubernetes.io/name: {{ include "hadoop.name" . }}
     helm.sh/chart: {{ include "hadoop.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: hdfs-dn
+    app.kubernetes.io/component: hdfs-dn  # 组件标签
 spec:
   selector:
     matchLabels:
+      # 匹配DataNode Pod的标签，用于StatefulSet管理Pod
       app.kubernetes.io/name: {{ include "hadoop.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: hdfs-dn
-  serviceName: {{ include "hadoop.fullname" . }}-hdfs-dn
-  replicas: {{ .Values.hdfs.dataNode.replicas }}
+  serviceName: {{ include "hadoop.fullname" . }}-hdfs-dn  # 关联的无头服务，用于Pod的稳定DNS名称
+  replicas: {{ .Values.hdfs.dataNode.replicas }}  # 副本数（从values获取，通常3+确保数据冗余）
   template:
     metadata:
       labels:
+        # Pod标签，需与selector匹配
         app.kubernetes.io/name: {{ include "hadoop.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: hdfs-dn
@@ -27,16 +31,18 @@ spec:
       affinity:
         podAntiAffinity:
         {{- if eq .Values.antiAffinity "hard" }}
+          # 硬反亲和性：强制DataNode Pod分布在不同节点（高可用要求）
           requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: "kubernetes.io/hostname"
+            - topologyKey: "kubernetes.io/hostname"  # 按主机名区分节点
               labelSelector:
                 matchLabels:
                   app.kubernetes.io/name: {{ include "hadoop.name" . }}
                   app.kubernetes.io/instance: {{ .Release.Name }}
                   app.kubernetes.io/component: hdfs-dn
         {{- else if eq .Values.antiAffinity "soft" }}
+          # 软反亲和性：优先分布在不同节点，不强制（资源紧张时可容忍同节点）
           preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 5
+            - weight: 5  # 优先级权重
               podAffinityTerm:
                 topologyKey: "kubernetes.io/hostname"
                 labelSelector:
@@ -45,42 +51,45 @@ spec:
                     app.kubernetes.io/instance: {{ .Release.Name }}
                     app.kubernetes.io/component: hdfs-dn
         {{- end }}
-      terminationGracePeriodSeconds: 0
+      terminationGracePeriodSeconds: 0  # 终止宽限期（DataNode可快速重启）
       containers:
-        - name: hdfs-dn
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        - name: hdfs-dn  # 容器名称
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"  # 镜像地址（从values获取）
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}  # 镜像拉取策略（Always/Never/IfNotPresent）
           command:
             - "/bin/bash"
-            - "/tmp/hadoop-config/bootstrap.sh"
-            - "-d"
+            - "/tmp/hadoop-config/bootstrap.sh"  # 启动脚本（从configmap挂载）
+            - "-d"  # 启动后后台运行并 tail 日志
           resources:
-{{ toYaml .Values.hdfs.dataNode.resources | indent 10 }}
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: 9864
-          #   initialDelaySeconds: 60
-          #   timeoutSeconds: 2
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: 9864
-          #   initialDelaySeconds: 60
-          #   timeoutSeconds: 2
+{{ toYaml .Values.hdfs.dataNode.resources | indent 10 }}  # 资源限制（CPU/内存，从values获取）
+          readinessProbe:
+            # 就绪探针：检测DataNode是否可提供服务（8042为DataNode Web端口，9864为HDFS 3.x端口）
+            httpGet:
+              path: /
+              port: 9864
+            initialDelaySeconds: 60  # 启动后延迟60s开始检测（等待服务初始化）
+            timeoutSeconds: 2  # 超时时间
+          livenessProbe:
+            # 存活探针：检测DataNode是否存活，不存活则重启容器
+            httpGet:
+              path: /
+              port: 9864
+            initialDelaySeconds: 60  # 启动后延迟60s检测
+            timeoutSeconds: 2
           volumeMounts:
-            - name: hadoop-config
+            - name: hadoop-config  # 挂载Hadoop配置文件（configmap）
               mountPath: /tmp/hadoop-config
-            - name: dfs
+            - name: dfs  # 挂载数据存储目录（持久化或emptyDir）
               mountPath: /root/hdfs/datanode
       volumes:
-        - name: hadoop-config
+        - name: hadoop-config  # 定义配置文件卷（关联configmap）
           configMap:
             name: {{ include "hadoop.fullname" . }}
       {{- if .Values.persistence.dataNode.enabled }}
+  # 持久化存储声明模板（当启用持久化时）
   volumeClaimTemplates:
     - metadata:
-        name: dfs
+        name: dfs  # 与volumeMounts中的名称对应
         labels:
           app.kubernetes.io/name: {{ include "hadoop.name" . }}
           helm.sh/chart: {{ include "hadoop.chart" . }}
@@ -88,18 +97,19 @@ spec:
           app.kubernetes.io/component: hdfs-dn
       spec:
         accessModes:
-          - {{ .Values.persistence.dataNode.accessMode | quote }}
+          - {{ .Values.persistence.dataNode.accessMode | quote }}  # 访问模式（通常ReadWriteOnce）
         resources:
           requests:
-            storage: {{ .Values.persistence.dataNode.size | quote }}
+            storage: {{ .Values.persistence.dataNode.size | quote }}  # 存储大小（从values获取）
     {{- if .Values.persistence.dataNode.storageClass }}
     {{- if (eq "-" .Values.persistence.dataNode.storageClass) }}
-        storageClassName: ""
+        storageClassName: ""  # 使用默认存储类
     {{- else }}
-        storageClassName: "{{ .Values.persistence.dataNode.storageClass }}"
+        storageClassName: "{{ .Values.persistence.dataNode.storageClass }}"  # 指定存储类
     {{- end }}
     {{- end }}
       {{- else }}
+        # 不启用持久化时，使用emptyDir（临时存储，Pod删除后数据丢失）
       - name: dfs
         emptyDir: { }
       {{- end }}

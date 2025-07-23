@@ -1,0 +1,42 @@
+# NameNode的RBAC配置，授予NN Pod修改自身标签的权限（用于标识活跃状态）
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn  # 服务账户名称（NN Pod使用此账户）
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-nn
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn  # 角色名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-nn
+rules:
+  - apiGroups: [""]  # 核心API组
+    resources: ["pods"]  # 资源类型为Pod
+    verbs: ["get", "patch"]  # 允许的操作：获取Pod信息、修改Pod标签
+    resourceNames:  # 仅允许操作指定的NN Pod（2个副本）
+      - "{{ include "hadoop.fullname" . }}-hdfs-nn-0"
+      - "{{ include "hadoop.fullname" . }}-hdfs-nn-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn  # 角色绑定名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-nn
+subjects:
+  - kind: ServiceAccount  # 绑定对象为ServiceAccount
+    name: {{ include "hadoop.fullname" . }}-hdfs-nn
+    namespace: {{ .Release.Namespace }}  # 当前命名空间
+roleRef:
+  kind: Role  # 绑定的角色
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn
+  apiGroup: rbac.authorization.k8s.io

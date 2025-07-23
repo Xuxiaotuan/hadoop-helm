@@ -1,0 +1,25 @@
+# 用于访问活跃（active）NameNode的服务，通过标签动态匹配当前活跃的NN
+# 客户端通过此服务自动连接到活跃NN，无需关心具体实例
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn-active  # 服务名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    helm.sh/chart: {{ include "hadoop.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-nn
+spec:
+  ports:
+    - name: dfs  # HDFS RPC端口（9000），用于客户端数据操作
+      port: 9000
+      protocol: TCP
+    - name: webhdfs  # NN WebUI端口（9870），用于管理界面访问
+      port: 9870
+  clusterIP: None  # 无头服务（直接访问活跃Pod）
+  selector:
+    # 核心：通过动态标签hdfs.nn.state=active匹配活跃NN（标签由bootstrap.sh维护）
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-nn
+    hdfs.nn.state: active

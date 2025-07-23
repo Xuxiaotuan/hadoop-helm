@@ -1,0 +1,15 @@
+# JournalNode的PodDisruptionBudget，确保JN在维护时的可用性（需多数副本存活）
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-jn  # 名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    helm.sh/chart: {{ include "hadoop.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-jn
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: hdfs-jn  # 匹配JN的Pod标签
+  minAvailable: {{ .Values.hdfs.journalNode.pdbMinAvailable }}  # 最小可用数（通常为ceil(replicas/2)，如3副本设为2）
