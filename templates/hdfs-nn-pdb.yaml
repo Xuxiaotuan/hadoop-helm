@@ -1,16 +1,19 @@
+# 定义NameNode的PodDisruptionBudget，用于控制节点维护时允许中断的Pod数量
+# 确保HDFS NameNode（元数据管理核心）在维护期间保持最小可用性
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "hadoop.fullname" . }}-hdfs-nn
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn  # 名称包含helm实例名，确保唯一性
   labels:
     app.kubernetes.io/name: {{ include "hadoop.name" . }}
     helm.sh/chart: {{ include "hadoop.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: hdfs-nn
+    app.kubernetes.io/component: hdfs-nn  # 标签标识组件为NameNode
 spec:
   selector:
     matchLabels:
+      # 匹配NameNode的Pod标签，确保PDB作用于正确的Pod
       app.kubernetes.io/name: {{ include "hadoop.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: hdfs-nn
-  minAvailable: {{ .Values.hdfs.nameNode.pdbMinAvailable }}
+  minAvailable: {{ .Values.hdfs.nameNode.pdbMinAvailable}}  # 最小可用实例数（从values中获取，通常为1，因NN为2副本高可用）

@@ -8,12 +8,12 @@ hadoopVersion: 3.3.6
 logLevel: INFO
 
 # Select antiAffinity as either hard or soft, default is soft
-antiAffinity: "soft"
+antiAffinity: "hard"
 
 hdfs:
+  clusterName: "ssc-hadoop"
   nameNode:
     pdbMinAvailable: 1
-
     resources:
       requests:
         memory: "256Mi"
@@ -21,7 +21,7 @@ hdfs:
       limits:
         memory: "2048Mi"
         cpu: "1000m"
-    zookeeperQuorum: "zookeeper-0.zookeeper-headless.default.svc.cluster.local:2181,zookeeper-1.zookeeper-headless.default.svc.cluster.local:2181,zookeeper-2.zookeeper-headless.default.svc.cluster.local:2181"
+    zookeeperQuorum: "zookeeper.zookeeper.svc.cluster.local"
 
 
   dataNode:
@@ -29,8 +29,6 @@ hdfs:
     # You still need to set up services + ingress for every DN
     # Datanodes will expect to
     externalHostname: ssc-hn-hadoop.com
-    externalDataPortRangeStart: 50500
-    externalHTTPPortRangeStart: 51000
     replicas: 3
     pdbMinAvailable: 2
     resources:
@@ -43,7 +41,7 @@ hdfs:
   webhdfs:
     enabled: true
 
-  jounralNode:
+  journalNode:
     replicas: 3
     pdbMinAvailable: 2
     resources:
@@ -59,16 +57,16 @@ persistence:
     enabled: true
     storageClass: "directpv-min-io"
     accessMode: ReadWriteOnce
-    size: 50Gi
+    size: 5Gi
 
   dataNode:
     enabled: true
     storageClass: "directpv-min-io"
     accessMode: ReadWriteOnce
-    size: 200Gi
+    size: 5Gi
 
   journalNode:
     enabled: true
     storageClass: "directpv-min-io"
     accessMode: ReadWriteOnce
-    size: 100Gi
+    size: 2Gi

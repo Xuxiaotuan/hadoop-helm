@@ -1,0 +1,18 @@
+# JournalNode的无头服务，用于JN之间及与NN的通信（同步编辑日志）
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hadoop.fullname" . }}-journalnode  # 服务名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-jn  # 组件标签
+spec:
+  clusterIP: None  # 无头服务，提供稳定DNS
+  ports:
+    - name: journal  # JN通信端口（8485为Hadoop 3.x+，2.x为8480）
+      port: 8485
+      targetPort: 8485  # 目标Pod端口（与容器内端口一致）
+  selector:
+    # 匹配JN的Pod标签，确保服务指向正确的Pod
+    app.kubernetes.io/component: hdfs-jn
