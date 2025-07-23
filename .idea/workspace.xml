@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d2baaf37-768b-498d-8d54-d598c6811e59" name="Changes" comment="#更新README 文档">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/checkstyle-idea.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/Project.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/ssc-hadoop-helm.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.vscode/settings.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Merge.Settings">
+    <option name="BRANCH" value="main" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="KubernetesSettings">
+    <option name="helmParameters">
+      <HelmParameters>
+        <option name="chartPath" value="$PROJECT_DIR$" />
+        <option name="valuesFiles">
+          <option value="values.yaml" />
+        </option>
+      </HelmParameters>
+    </option>
+  </component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="2" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="2zrHuBnxavNnXDdwcEdwBuvqquH" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+    <option name="showMembers" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "main-wy",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/wanyi/workspace/ssc-hadoop-helm/templates",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.lookFeel",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/templates" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="ssc-hadoop-helm" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+        <option name="com.soywiz.korge.intellij.UpdateResourceBeforeRunTask" enabled="false" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="ssc-hadoop-helm" />
+      <option name="filePath" />
+      <method v="2">
+        <option name="com.soywiz.korge.intellij.UpdateResourceBeforeRunTask" enabled="false" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-fdfe4dae3a2d-intellij.indexing.shared.core-IU-243.22562.145" />
+        <option value="bundled-js-predefined-d6986cc7102b-deb605915726-JavaScript-IU-243.22562.145" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d2baaf37-768b-498d-8d54-d598c6811e59" name="Changes" comment="" />
+      <created>1752482492295</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1752482492295</updated>
+      <workItem from="1752482493399" duration="2839000" />
+      <workItem from="1752542449711" duration="4780000" />
+      <workItem from="1752551810562" duration="52000" />
+      <workItem from="1752551866840" duration="6466000" />
+      <workItem from="1752572038445" duration="3719000" />
+      <workItem from="1752650326188" duration="10420000" />
+      <workItem from="1752723738939" duration="7196000" />
+      <workItem from="1752741864482" duration="52540000" />
+      <workItem from="1753256204540" duration="82000" />
+      <workItem from="1753256289888" duration="49000" />
+      <workItem from="1753256342082" duration="24000" />
+      <workItem from="1753256368633" duration="49000" />
+      <workItem from="1753256421455" duration="179000" />
+      <workItem from="1753256603427" duration="108000" />
+      <workItem from="1753256714287" duration="2894000" />
+    </task>
+    <task id="LOCAL-00001" summary="skip other file">
+      <option name="closed" value="true" />
+      <created>1752567603577</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1752567603577</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Hadoop on k8s 实现HA">
+      <option name="closed" value="true" />
+      <created>1752723866426</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1752723866426</updated>
+    </task>
+    <task id="LOCAL-00003" summary="更新存储实现">
+      <option name="closed" value="true" />
+      <created>1752737429729</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1752737429729</updated>
+    </task>
+    <task id="LOCAL-00004" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752745675508</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1752745675508</updated>
+    </task>
+    <task id="LOCAL-00005" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752745759743</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1752745759743</updated>
+    </task>
+    <task id="LOCAL-00006" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752745786457</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1752745786457</updated>
+    </task>
+    <task id="LOCAL-00007" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752745851645</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1752745851645</updated>
+    </task>
+    <task id="LOCAL-00008" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752745932570</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1752745932570</updated>
+    </task>
+    <task id="LOCAL-00009" summary="#更新dockerfile 依赖包">
+      <option name="closed" value="true" />
+      <created>1752818946513</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1752818946513</updated>
+    </task>
+    <task id="LOCAL-00010" summary="#更新dockerfile 版本依赖">
+      <option name="closed" value="true" />
+      <created>1752823066719</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1752823066719</updated>
+    </task>
+    <task id="LOCAL-00011" summary="#更新dockerfile 版本依赖">
+      <option name="closed" value="true" />
+      <created>1752824316660</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1752824316660</updated>
+    </task>
+    <task id="LOCAL-00012" summary="#优化Namenode HA高可用，新增ReadMe文档">
+      <option name="closed" value="true" />
+      <created>1753243088108</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1753243088108</updated>
+    </task>
+    <task id="LOCAL-00013" summary="#合并分支">
+      <option name="closed" value="true" />
+      <created>1753256844157</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1753256844157</updated>
+    </task>
+    <task id="LOCAL-00014" summary="#更新README 文档">
+      <option name="closed" value="true" />
+      <created>1753256945632</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1753256945632</updated>
+    </task>
+    <task id="LOCAL-00015" summary="#更新README 文档">
+      <option name="closed" value="true" />
+      <created>1753258028732</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1753258028733</updated>
+    </task>
+    <task id="LOCAL-00016" summary="#更新README 文档">
+      <option name="closed" value="true" />
+      <created>1753260092714</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1753260092714</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="main-wy" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="skip other file" />
+    <MESSAGE value="Hadoop on k8s 实现HA" />
+    <MESSAGE value="更新存储实现" />
+    <MESSAGE value="#更新dockerfile 依赖包" />
+    <MESSAGE value="#更新dockerfile 版本依赖" />
+    <MESSAGE value="#优化Namenode HA高可用，新增ReadMe文档" />
+    <MESSAGE value="#合并分支" />
+    <MESSAGE value="#更新README 文档" />
+    <option name="LAST_COMMIT_MESSAGE" value="#更新README 文档" />
+  </component>
+</project>
