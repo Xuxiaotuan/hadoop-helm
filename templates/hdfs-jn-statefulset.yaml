@@ -1,0 +1,104 @@
+# JournalNode的StatefulSet配置，用于同步NameNode的编辑日志（NN高可用核心组件）
+# 至少3个副本，通过多数派机制确保日志一致性
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-jn  # 唯一名称
+  labels:
+    app.kubernetes.io/component: hdfs-jn  # 组件标签
+spec:
+  serviceName: {{ include "hadoop.fullname" . }}-hdfs-jn  # 关联的无头服务
+  replicas: {{ .Values.hdfs.journalNode.replicas }}  # 副本数（至少3个，确保奇数）
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: hdfs-jn  # 匹配JN Pod的标签
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: hdfs-jn  # Pod标签
+    spec:
+      # 反亲和性配置：确保JN分布在不同节点（避免单点故障导致日志同步失败）
+      affinity:
+        podAntiAffinity:
+          {{- if eq .Values.antiAffinity "hard" }}
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ include "hadoop.name" . }}
+                  app.kubernetes.io/instance: {{ .Release.Name }}
+                  app.kubernetes.io/component: hdfs-jn
+          {{- else if eq .Values.antiAffinity "soft" }}
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 5
+              podAffinityTerm:
+                topologyKey: "kubernetes.io/hostname"
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                    app.kubernetes.io/component: hdfs-jn
+          {{- end }}
+      containers:
+        - name: hdfs-jn  # 容器名称
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"  # 镜像地址
+          command:
+            - "/bin/bash"
+            - "/tmp/hadoop-config/bootstrap.sh"  # 启动脚本
+            - "-d"  # 后台运行
+          # 健康检查探针
+          readinessProbe:
+            httpGet:
+              path: /  # JN WebUI根路径
+              port: 8480  # Hadoop 2.x端口（3.x+为8485，需与实际版本匹配）
+            initialDelaySeconds: 90  # JN启动较慢，延长初始化等待
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4  # 允许短暂网络波动
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8480
+            initialDelaySeconds: 120  # 存活检查延迟更长
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 4
+          resources:
+{{ toYaml .Values.hdfs.journalNode.resources | indent 10 }}  # 资源限制
+          volumeMounts:
+            - name: hadoop-config  # 挂载配置文件
+              mountPath: /tmp/hadoop-config
+            - name: dfs  # 挂载JN日志存储目录
+              mountPath: /root/hdfs/journalnode
+
+      volumes:
+        - name: hadoop-config  # 配置文件卷
+          configMap:
+            name: {{ include "hadoop.fullname" . }}
+  {{- if .Values.persistence.journalNode.enabled }}
+  # 持久化存储声明模板（JN日志需持久化，确保NN元数据一致性）
+  volumeClaimTemplates:
+    - metadata:
+        name: dfs  # 与volumeMounts名称一致
+        labels:
+          app.kubernetes.io/name: {{ include "hadoop.name" . }}
+          helm.sh/chart: {{ include "hadoop.chart" . }}
+          app.kubernetes.io/instance: {{ .Release.Name }}
+          app.kubernetes.io/component: hdfs-jn
+      spec:
+        accessModes:
+          - {{ .Values.persistence.journalNode.accessMode | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.journalNode.size | quote }}
+        {{- if .Values.persistence.journalNode.storageClass }}
+          {{- if (eq "-" .Values.persistence.journalNode.storageClass) }}
+            storageClassName: ""
+          {{- else }}
+            storageClassName: "{{ .Values.persistence.journalNode.storageClass }}"
+          {{- end }}
+        {{- else }}
+          - name: hdfs-jn  # 不指定存储类时的默认配置（仅示例）
+            emptyDir: { }
+        {{- end }}
+       {{- end }}

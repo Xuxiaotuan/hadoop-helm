@@ -1,0 +1,15 @@
+1. 检查HDFS状态命令（需替换命名空间）：
+   kubectl exec -n {{ .Release.Namespace }} -it {{ include "hadoop.fullname" . }}-hdfs-nn-0 -- /opt/hadoop/bin/hdfs dfsadmin -report
+   说明：该命令用于查看DataNode节点状态、存储空间等关键信息
+
+2. 查看活跃NameNode：
+   kubectl get pods -n {{ .Release.Namespace }} -l hdfs.nn.state=active
+   说明：通过标签快速定位当前活跃的NN节点
+
+3. 访问WebUI：
+   浏览器打开 http://ssc-hn.hdfs.webui.com (需配置本地hosts映射或DNS)
+   说明：通过Ingress暴露的WebUI端口为9870，用于可视化管理HDFS
+
+4. 配置持久化：
+   如需持久化存储HDFS数据，请在values.yaml中配置persistence相关参数（nameNode/dataNode/journalNode）
+   说明：默认可能使用emptyDir，重启后数据丢失，生产环境必须配置持久卷

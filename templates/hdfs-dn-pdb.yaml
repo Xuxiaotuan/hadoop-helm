@@ -1,0 +1,19 @@
+# 定义DataNode的PodDisruptionBudget，控制DataNode在维护时的最小可用数量
+# 确保HDFS数据存储节点（负责实际数据存储）的可用性，避免数据丢失风险
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-dn  # 名称包含helm实例名，确保唯一性
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    helm.sh/chart: {{ include "hadoop.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-dn  # 标签标识组件为DataNode
+spec:
+  selector:
+    matchLabels:
+      # 匹配DataNode的Pod标签，确保PDB作用于正确的Pod
+      app.kubernetes.io/name: {{ include "hadoop.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: hdfs-dn
+  minAvailable: {{ .Values.hdfs.dataNode.pdbMinAvailable}}  # 最小可用实例数（从values获取，通常为副本数的多数，如3副本时设为2）

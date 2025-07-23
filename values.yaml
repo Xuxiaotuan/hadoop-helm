@@ -1,0 +1,72 @@
+image:
+  repository: docker.ssc-hn.com/bigdata/ssc-hadoop
+  tag: v3.3.6
+  pullPolicy: IfNotPresent
+
+# The version of the hadoop libraries being used in the image.
+hadoopVersion: 3.3.6
+logLevel: INFO
+
+# Select antiAffinity as either hard or soft, default is soft
+antiAffinity: "hard"
+
+hdfs:
+  clusterName: "ssc-hadoop"
+  nameNode:
+    pdbMinAvailable: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+    zookeeperQuorum: "zookeeper.zookeeper.svc.cluster.local"
+
+
+  dataNode:
+    # Will be used as dfs.datanode.hostname
+    # You still need to set up services + ingress for every DN
+    # Datanodes will expect to
+    externalHostname: ssc-hn-hadoop.com
+    replicas: 3
+    pdbMinAvailable: 2
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+  webhdfs:
+    enabled: true
+
+  journalNode:
+    replicas: 3
+    pdbMinAvailable: 2
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "10m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
+
+persistence:
+  nameNode:
+    enabled: true
+    storageClass: "directpv-min-io"
+    accessMode: ReadWriteOnce
+    size: 5Gi
+
+  dataNode:
+    enabled: true
+    storageClass: "directpv-min-io"
+    accessMode: ReadWriteOnce
+    size: 5Gi
+
+  journalNode:
+    enabled: true
+    storageClass: "directpv-min-io"
+    accessMode: ReadWriteOnce
+    size: 2Gi

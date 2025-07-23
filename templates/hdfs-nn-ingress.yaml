@@ -1,0 +1,18 @@
+# NameNode WebUI的Ingress配置，用于外部访问HDFS NameNode的Web管理界面（默认9870端口）
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn-ingress  # 唯一名称
+spec:
+  rules:
+    - host: ssc-hn.hdfs.webui.com  # 自定义访问域名（需提前配置DNS解析）
+      http:
+        paths:
+          - path: /  # 匹配根路径
+            pathType: Prefix  # 前缀匹配
+            backend:
+              service:
+                # 关联活跃NameNode的Service（通过标签动态匹配活跃NN）
+                name: {{ include "hadoop.fullname" . }}-hdfs-nn-active
+                port:
+                  name: webhdfs  # 对应Service中定义的9870端口名称

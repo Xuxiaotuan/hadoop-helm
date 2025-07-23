@@ -1,0 +1,22 @@
+# DataNode的无头服务（Headless Service），用于为StatefulSet中的Pod提供稳定的DNS记录
+# 无头服务无ClusterIP，通过DNS解析直接访问Pod（格式：pod-name.service-name.namespace.svc.cluster.local）
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hadoop.fullname" . }}-hdfs-dn  # 服务名称
+  labels:
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    helm.sh/chart: {{ include "hadoop.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-dn  # 组件标签
+spec:
+  ports:
+    - name: dfs  # 端口名称（HDFS数据传输端口，默认9000）
+      port: 9000
+      protocol: TCP
+  clusterIP: None  # 无头服务标识
+  selector:
+    # 匹配DataNode的Pod标签，将服务流量转发到这些Pod
+    app.kubernetes.io/name: {{ include "hadoop.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: hdfs-dn
