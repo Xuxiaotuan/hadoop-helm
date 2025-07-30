@@ -174,46 +174,26 @@ uninstall_hadoop() {
     fi
 }
 
-# 清理残留资源
+# 清理Hadoop相关残留资源（只删带app=hadoop标签的）
 cleanup_resources() {
     local namespace=${1:-default}
     
-    log_warn "清理命名空间 $namespace 中的残留资源..."
+    log_warn "仅清理命名空间 $namespace 中 app=hadoop 的残留资源..."
     
-    # 删除所有Pod
-    kubectl delete pods --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    # 删除所有带app=hadoop标签的资源
+    kubectl delete pods -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete statefulset -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete pvc -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete svc -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete configmap -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete secret -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete ingress -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete networkpolicy -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete rolebinding -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete role -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete serviceaccount -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
     
-    # 删除所有StatefulSet
-    kubectl delete statefulset --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有PVC
-    kubectl delete pvc --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有Service
-    kubectl delete svc --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有ConfigMap
-    kubectl delete configmap --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有Secret
-    kubectl delete secret --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有Ingress
-    kubectl delete ingress --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有NetworkPolicy
-    kubectl delete networkpolicy --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有RoleBinding
-    kubectl delete rolebinding --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有Role
-    kubectl delete role --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    # 删除所有ServiceAccount
-    kubectl delete serviceaccount --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
-    log_info "残留资源清理完成"
+    log_info "Hadoop相关残留资源清理完成"
 }
 
 # 创建本地PV
