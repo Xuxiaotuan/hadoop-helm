@@ -33,7 +33,7 @@ hdfs:
     enabled: false
 
   journalNode:
-    replicas: 0  # 完全禁用 JN
+    replicas: 3  # 启用3个JournalNode
 
 persistence:
   nameNode:
@@ -49,7 +49,10 @@ persistence:
     storageClass: ""  # 使用默认存储类
 
   journalNode:
-    enabled: false
+    enabled: true  # 启用JournalNode持久化
+    size: "5Gi"
+    accessMode: "ReadWriteOnce"
+    storageClass: ""  # 使用默认存储类
 
 image:
   repository: hadoop-xxt

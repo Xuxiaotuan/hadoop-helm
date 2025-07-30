@@ -116,16 +116,79 @@ upgrade_hadoop() {
 uninstall_hadoop() {
     local release_name=${1:-hadoop-cluster}
     local namespace=${2:-default}
+    local force_cleanup=${3:-false}
     
     log_warn "即将卸载Hadoop集群: $release_name"
-    read -p "确认卸载吗？(y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        helm uninstall $release_name --namespace $namespace
-        log_info "Hadoop集群已卸载"
+    
+    if [ "$force_cleanup" = "true" ]; then
+        log_warn "将执行强制清理（包括PVC）"
+        read -p "确认强制卸载吗？这将删除所有数据！(y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # 强制删除所有Pod
+            log_info "强制删除Pod..."
+            kubectl delete pods --all -n $namespace --force --grace-period=0 2>/dev/null || true
+            
+            # 强制删除StatefulSet
+            log_info "强制删除StatefulSet..."
+            kubectl delete statefulset --all -n $namespace --force --grace-period=0 2>/dev/null || true
+            
+            # 强制删除PVC
+            log_info "强制删除PVC..."
+            kubectl delete pvc --all -n $namespace --force --grace-period=0 2>/dev/null || true
+            
+            # 删除Helm release
+            log_info "删除Helm release..."
+            helm uninstall $release_name --namespace $namespace 2>/dev/null || true
+            
+            log_info "Hadoop集群已强制卸载"
+        else
+            log_info "取消强制卸载操作"
+        fi
     else
-        log_info "取消卸载操作"
+        read -p "确认卸载吗？(y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # 先尝试正常卸载
+            helm uninstall $release_name --namespace $namespace
+            
+            # 检查是否还有残留资源
+            if kubectl get pods -n $namespace 2>/dev/null | grep -q .; then
+                log_warn "检测到残留资源，建议使用 --force 选项进行强制清理"
+            fi
+            
+            log_info "Hadoop集群已卸载"
+        else
+            log_info "取消卸载操作"
+        fi
     fi
+}
+
+# 清理残留资源
+cleanup_resources() {
+    local namespace=${1:-default}
+    
+    log_warn "清理命名空间 $namespace 中的残留资源..."
+    
+    # 删除所有Pod
+    kubectl delete pods --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有StatefulSet
+    kubectl delete statefulset --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有PVC
+    kubectl delete pvc --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有Service
+    kubectl delete svc --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有ConfigMap
+    kubectl delete configmap --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有Secret
+    kubectl delete secret --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    log_info "残留资源清理完成"
 }
 
 # 显示帮助信息
@@ -138,18 +201,22 @@ show_help() {
     echo "  deploy   部署Hadoop集群"
     echo "  upgrade  升级Hadoop集群"
     echo "  uninstall 卸载Hadoop集群"
+    echo "  cleanup  清理残留资源"
     echo "  status   查看集群状态"
     echo "  help     显示此帮助信息"
     echo ""
     echo "选项:"
     echo "  -r, --release NAME    Release名称 (默认: hadoop-cluster)"
     echo "  -n, --namespace NAME  命名空间 (默认: default)"
+    echo "  --force              强制清理（用于卸载时）"
     echo ""
     echo "示例:"
     echo "  $0 deploy                    # 部署到默认命名空间"
     echo "  $0 deploy -n hadoop         # 部署到hadoop命名空间"
     echo "  $0 upgrade -r my-hadoop     # 升级名为my-hadoop的集群"
     echo "  $0 uninstall -n hadoop      # 卸载hadoop命名空间的集群"
+    echo "  $0 uninstall -n hadoop --force  # 强制卸载（包括PVC）"
+    echo "  $0 cleanup -n hadoop        # 清理残留资源"
 }
 
 # 查看集群状态
@@ -181,11 +248,12 @@ main() {
     local command=""
     local release_name="hadoop-cluster"
     local namespace="default"
+    local force_cleanup="false"
     
     # 解析命令行参数
     while [[ $# -gt 0 ]]; do
         case $1 in
-            deploy|upgrade|uninstall|status|help)
+            deploy|upgrade|uninstall|cleanup|status|help)
                 command=$1
                 shift
                 ;;
@@ -196,6 +264,10 @@ main() {
             -n|--namespace)
                 namespace=$2
                 shift 2
+                ;;
+            --force)
+                force_cleanup="true"
+                shift
                 ;;
             -h|--help)
                 show_help
@@ -231,7 +303,11 @@ main() {
         uninstall)
             check_k8s
             check_helm
-            uninstall_hadoop $release_name $namespace
+            uninstall_hadoop $release_name $namespace $force_cleanup
+            ;;
+        cleanup)
+            check_k8s
+            cleanup_resources $namespace
             ;;
         status)
             check_k8s
