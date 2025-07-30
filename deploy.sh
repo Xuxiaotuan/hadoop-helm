@@ -151,6 +151,10 @@ uninstall_hadoop() {
             log_info "删除本地PV..."
             delete_local_pvs $namespace
             
+            # 删除所有Hadoop相关PV（根据常用label）
+            kubectl delete pv -l "app.kubernetes.io/name=hadoop" 2>/dev/null || true
+            kubectl delete pv -l "app=hadoop" 2>/dev/null || true
+
             log_info "Hadoop集群已强制卸载"
         else
             log_info "取消强制卸载操作"
@@ -208,7 +212,11 @@ cleanup_resources() {
     
     # 删除所有PVC（强制清理）
     kubectl delete pvc --all -n $namespace --force --grace-period=0 2>/dev/null || true
-    
+
+    # 删除所有Hadoop相关PV（根据常用label）
+    kubectl delete pv -l "app.kubernetes.io/name=hadoop" 2>/dev/null || true
+    kubectl delete pv -l "app=hadoop" 2>/dev/null || true
+
     log_info "Hadoop相关残留资源清理完成"
 }
 
