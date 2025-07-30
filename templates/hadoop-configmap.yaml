@@ -72,6 +72,7 @@ data:
       fi
 
       "${HADOOP_HOME}/bin/hdfs" --loglevel {{ .Values.logLevel }} --daemon start namenode
+      tail -f /dev/null
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
@@ -93,6 +94,7 @@ data:
       
       if [ "$nn_ready" = true ]; then
         "${HADOOP_HOME}/bin/hdfs" --loglevel {{ .Values.logLevel }} --daemon start datanode
+        tail -f /dev/null
       else
         log "ERROR" "所有NameNode都未就绪，退出"
         exit 1
@@ -105,6 +107,7 @@ data:
       
       # 启动JournalNode
       "${HADOOP_HOME}/bin/hdfs" --loglevel {{ .Values.logLevel }} --daemon start journalnode
+      tail -f /dev/null
     fi
 
     if [[ $1 == "-d" ]]; then
