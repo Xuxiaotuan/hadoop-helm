@@ -86,7 +86,7 @@ spec:
             - name: hadoop-config
               mountPath: /tmp/hadoop-config
             - name: dfs
-              mountPath: /root/hdfs/journalnode
+              mountPath: /data/hdfs/journalnode
 
       volumes:
         # 配置文件卷：挂载 configMap（含 bootstrap.sh、xml 配置等）
