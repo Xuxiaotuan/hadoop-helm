@@ -25,7 +25,6 @@ data:
 
     log "INFO" "启动Hadoop组件初始化，HADOOP_HOME=${HADOOP_HOME}"
 
-    # 保证日志目录存在且有权限
     mkdir -p /opt/hadoop/logs
     chmod 777 /opt/hadoop/logs
 
@@ -60,9 +59,9 @@ data:
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
 
-      # 获取namenode索引
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
-      
+      export HADOOP_NAMENODE_OPTS="$HADOOP_NAMENODE_OPTS -Ddfs.ha.namenode.id=nn${nn_index}"
+
       if [ ! -f /data/hdfs/namenode/formated ]; then
         if [ "$nn_index" = "0" ]; then
           log "INFO" "格式化第一个NameNode"
@@ -70,38 +69,36 @@ data:
           touch /data/hdfs/namenode/formated
         else
           log "INFO" "等待第一个NameNode格式化完成"
-          # 等待第一个namenode格式化完成
           timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
         fi
       fi
 
-      # 前台启动 NameNode
       "${HADOOP_HOME}/bin/hdfs" namenode
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
       log "INFO" "启动DataNode"
       mkdir -p /data/hdfs/datanode
-      
-      # 补充端口替换
+
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
 
-      # 等待任意一个namenode就绪
-      nn_services=("{{ include "hadoop.fullname" . }}-hdfs-nn-0" "{{ include "hadoop.fullname" . }}-hdfs-nn-1" "{{ include "hadoop.fullname" . }}-hdfs-nn-2")
       nn_ready=false
-      
-      for nn_service in "${nn_services[@]}"; do
+      REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
+      for i in $(seq 0 $((REPLICA_COUNT - 1))); do
+        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}}.{{ include "hadoop.fullname" . }}-hdfs-nn"
         tmp_url="http://${nn_service}:${NN_WEB_PORT}"
-        if timeout 2m bash -c "until curl -sf '${tmp_url}'; do sleep 5; done"; then
-          log "INFO" "NameNode ${nn_service} 已就绪"
-          nn_ready=true
-          break
-        fi
+        for retry in {1..24}; do
+          if curl -sf "${tmp_url}"; then
+            log "INFO" "NameNode ${nn_service} 已就绪"
+            nn_ready=true
+            break 2
+          fi
+          sleep 5
+        done
       done
-      
+
       if [ "$nn_ready" = true ]; then
-        # 前台启动 DataNode，日志直接输出到 stdout
         "${HADOOP_HOME}/bin/hdfs" datanode
       else
         log "ERROR" "所有NameNode都未就绪，退出"
@@ -112,12 +109,9 @@ data:
     if [[ "${HOSTNAME}" =~ "hdfs-jn" ]]; then
       log "INFO" "启动JournalNode"
       mkdir -p /data/hdfs/journalnode
-      
-      # 前台启动 JournalNode
       "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
-    # 保持容器运行的 -d 分支和 tail/wait 逻辑全部删除
     if [[ $1 == "-bash" ]]; then
       /bin/bash
     fi
@@ -127,7 +121,7 @@ data:
     <configuration>
       <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://{{ .Values.hdfs.rpcAddress }}</value>
+        <value>hdfs://{{ .Values.hdfs.clusterName }}</value>
       </property>
       <property>
         <name>dfs.nameservices</name>
@@ -135,31 +129,21 @@ data:
       </property>
       <property>
         <name>dfs.ha.namenodes.{{ .Values.hdfs.clusterName }}</name>
-        <value>nn0,nn1,nn2</value>
+        <value>{{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}{{ if $i }},{{ end }}nn{{ $i }}{{- end }}</value>
+      </property>
+      {{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}
+      <property>
+        <name>dfs.namenode.rpc-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9000</value>
       </property>
       <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
+        <name>dfs.namenode.http-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9870</value>
       </property>
+      {{- end }}
       <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
-      </property>
-      <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
+        <name>dfs.client.failover.proxy.provider.{{ .Values.hdfs.clusterName }}</name>
+        <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
       </property>
     </configuration>
 
@@ -168,7 +152,7 @@ data:
     <configuration>
       <property>
         <name>dfs.replication</name>
-        <value>{{ .Values.hdfs.replication | default 3 }}</value>
+        <value>{{ .Values.hdfs.replication | default 1 }}</value>
       </property>
       <property>
         <name>dfs.webhdfs.enabled</name>
@@ -183,12 +167,8 @@ data:
         <value>file:///data/hdfs/namenode</value>
       </property>
       <property>
-        <name>dfs.namenode.rpc-address</name>
-        <value>0.0.0.0:9000</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address</name>
-        <value>0.0.0.0:9870</value>
+        <name>dfs.journalnode.edits.dir</name>
+        <value>/data/hdfs/journalnode</value>
       </property>
       <property>
         <name>dfs.datanode.http.address</name>
@@ -204,34 +184,37 @@ data:
       </property>
       <property>
         <name>dfs.ha.namenodes.{{ .Values.hdfs.clusterName }}</name>
-        <value>nn0,nn1,nn2</value>
+        <value>{{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}{{ if $i }},{{ end }}nn{{ $i }}{{- end }}</value>
+      </property>
+      {{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}
+      <property>
+        <name>dfs.namenode.rpc-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9000</value>
       </property>
       <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
+        <name>dfs.namenode.http-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9870</value>
+      </property>
+      {{- end }}
+      <property>
+        <name>dfs.namenode.shared.edits.dir</name>
+        <value>qjournal://{{- range $i, $e := until (.Values.hdfs.journalNode.replicas | int) }}{{ if $i }};{{ end }}{{ include "hadoop.fullname" $ }}-hdfs-jn-{{ $i }}.{{ include "hadoop.fullname" $ }}-journalnode:8485{{- end }}/{{ .Values.hdfs.clusterName }}</value>
       </property>
       <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
+        <name>dfs.ha.automatic-failover.enabled</name>
+        <value>false</value>
       </property>
       <property>
-        <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
+        <name>dfs.ha.fencing.methods</name>
+        <value>sshfence</value>
       </property>
       <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
-      </property>
-      <property>
-        <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
+        <name>dfs.ha.fencing.ssh.private-key-files</name>
+        <value>/home/hadoop/.ssh/id_rsa</value>
       </property>
     </configuration>
 
   slaves: |
-    localhost
-
+{{- range $i, $e := until (.Values.hdfs.dataNode.replicas | int) }}
+    {{ include "hadoop.fullname" $ }}-hdfs-dn-{{ $i }}
+{{- end }}

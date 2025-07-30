@@ -56,7 +56,6 @@ spec:
           command:
             - "/bin/bash"
             - "/tmp/hadoop-config/bootstrap.sh"
-            - "-d"  # ✅ 去掉 -zkfc，非HA模式
           resources:
 {{ toYaml .Values.hdfs.nameNode.resources | indent 12 }}
           readinessProbe:
