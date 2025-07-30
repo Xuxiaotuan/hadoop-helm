@@ -219,5 +219,5 @@ data:
 
   slaves: |
 {{- range $i, $e := until (.Values.hdfs.dataNode.replicas | int) }}
-{{ include "hadoop.fullname" $ }}-hdfs-dn-{{ $i }}
-{{- end }}
+    {{ include "hadoop.fullname" $ }}-hdfs-dn-{{ $i }}
+{{- end }} 
