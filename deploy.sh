@@ -174,24 +174,40 @@ uninstall_hadoop() {
     fi
 }
 
-# 清理Hadoop相关残留资源（只删带app=hadoop标签的）
+# 清理Hadoop相关残留资源（删除所有Hadoop相关资源）
 cleanup_resources() {
     local namespace=${1:-default}
     
-    log_warn "仅清理命名空间 $namespace 中 app=hadoop 的残留资源..."
+    log_warn "清理命名空间 $namespace 中所有Hadoop相关资源..."
     
-    # 删除所有带app=hadoop标签的资源
-    kubectl delete pods -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete statefulset -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete pvc -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete svc -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete configmap -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete secret -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete ingress -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete networkpolicy -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete rolebinding -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete role -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
-    kubectl delete serviceaccount -l app=hadoop -n $namespace --force --grace-period=0 2>/dev/null || true
+    # 删除所有Hadoop相关的资源（使用多种标签匹配）
+    kubectl delete pods -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete statefulset -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete pvc -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete svc -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete configmap -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete secret -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete ingress -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete networkpolicy -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete rolebinding -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete role -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete serviceaccount -l "app.kubernetes.io/name=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 也尝试删除带app=hadoop标签的资源
+    kubectl delete pods -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete statefulset -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete pvc -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete svc -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete configmap -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete secret -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete ingress -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete networkpolicy -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete rolebinding -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete role -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    kubectl delete serviceaccount -l "app=hadoop" -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有PVC（强制清理）
+    kubectl delete pvc --all -n $namespace --force --grace-period=0 2>/dev/null || true
     
     log_info "Hadoop相关残留资源清理完成"
 }

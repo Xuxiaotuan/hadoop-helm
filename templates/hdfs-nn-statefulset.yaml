@@ -110,6 +110,5 @@ spec:
           matchLabels:
             app: hadoop
             type: namenode
-            pvIndex: "{{ .Ordinal }}"
   {{- end }}
 

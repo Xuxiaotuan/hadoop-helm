@@ -121,6 +121,5 @@ spec:
           matchLabels:
             app: hadoop
             type: journalnode
-            pvIndex: "{{ .Ordinal }}"
   {{- end }}
 
