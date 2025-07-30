@@ -52,30 +52,6 @@ data:
       log "WARN" "未找到 slaves 文件，跳过"
     fi
 
-    if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
-      log "INFO" "启动NameNode"
-      mkdir -p /data/hdfs/namenode
-
-      sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
-      sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
-
-      nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
-      export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
-
-      if [ ! -f /data/hdfs/namenode/formated ]; then
-        if [ "$nn_index" = "0" ]; then
-          log "INFO" "格式化第一个NameNode"
-          "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
-          touch /data/hdfs/namenode/formated
-        else
-          log "INFO" "等待第一个NameNode格式化完成"
-          timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
-        fi
-      fi
-
-      "${HADOOP_HOME}/bin/hdfs" namenode
-    fi
-
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
       log "INFO" "启动DataNode"
       mkdir -p /data/hdfs/datanode
@@ -115,7 +91,55 @@ data:
       "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
-    if [[ $1 == "-bash" ]]; then
+    if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
+      log "INFO" "启动NameNode"
+      mkdir -p /data/hdfs/namenode
+
+      sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+
+      nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
+      export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
+
+      # 等待JournalNode就绪
+      log "INFO" "等待JournalNode就绪"
+      jn_ready=false
+      JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
+      for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
+        jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-journalnode"
+        for retry in {1..30}; do
+          if nslookup "${jn_service}" >/dev/null 2>&1; then
+            log "INFO" "JournalNode ${jn_service} 已就绪"
+            jn_ready=true
+            break 2
+          fi
+          sleep 5
+        done
+        if [ "$jn_ready" = true ]; then
+          break
+        fi
+      done
+
+      if [ "$jn_ready" = true ]; then
+        if [ ! -f /data/hdfs/namenode/formated ]; then
+          if [ "$nn_index" = "0" ]; then
+            log "INFO" "格式化第一个NameNode"
+            "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
+            touch /data/hdfs/namenode/formated
+          else
+            log "INFO" "等待第一个NameNode格式化完成"
+            timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
+          fi
+        fi
+
+        "${HADOOP_HOME}/bin/hdfs" namenode
+      else
+        log "ERROR" "JournalNode未就绪，退出"
+        exit 1
+      fi
+    fi
+
+    if [[ "${1:-}" == "-bash" ]]; then
       /bin/bash
     fi
 
