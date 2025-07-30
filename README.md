@@ -25,7 +25,7 @@
 # 赋予脚本执行权限
 chmod +x deploy.sh
 
-# 部署到hadoop命名空间
+# 部署到hadoop命名空间（自动创建本地PV）
 ./deploy.sh deploy -n hadoop
 
 # 查看集群状态
@@ -37,7 +37,7 @@ chmod +x deploy.sh
 # 卸载集群（普通卸载）
 ./deploy.sh uninstall -n hadoop
 
-# 强制卸载（清理所有残留，包括PVC）
+# 强制卸载（清理所有残留，包括PVC和本地PV）
 ./deploy.sh uninstall -n hadoop --force
 
 # 清理命名空间内所有残留资源
@@ -71,6 +71,10 @@ helm uninstall hadoop-cluster -n hadoop
 3. 多NameNode高可用模式下，需启用JournalNode
 4. DataNode会自动连接到可用的NameNode
 5. 强制卸载/清理会删除所有数据，请谨慎操作
+6. 脚本会自动检测local-storage存储类并创建本地PV
+7. 部署时会自动在节点上创建存储目录
+8. 卸载时会自动清理PV和存储目录
+9. PV和存储目录使用命名空间前缀，避免与现有资源冲突
 
 ## 主要配置参数
 

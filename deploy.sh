@@ -76,6 +76,12 @@ deploy_hadoop() {
         kubectl create namespace $namespace --dry-run=client -o yaml | kubectl apply -f -
     fi
     
+    # 检查是否使用local-storage，如果是则创建PV
+    if kubectl get storageclass local-storage &>/dev/null; then
+        log_info "检测到local-storage存储类，创建本地PV..."
+        create_local_pvs $namespace
+    fi
+    
     # 部署Helm chart
     helm install $release_name ./ \
         --namespace $namespace \
@@ -121,7 +127,7 @@ uninstall_hadoop() {
     log_warn "即将卸载Hadoop集群: $release_name"
     
     if [ "$force_cleanup" = "true" ]; then
-        log_warn "将执行强制清理（包括PVC）"
+        log_warn "将执行强制清理（包括PVC和本地PV）"
         read -p "确认强制卸载吗？这将删除所有数据！(y/N): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -140,6 +146,10 @@ uninstall_hadoop() {
             # 删除Helm release
             log_info "删除Helm release..."
             helm uninstall $release_name --namespace $namespace 2>/dev/null || true
+            
+            # 删除本地PV
+            log_info "删除本地PV..."
+            delete_local_pvs $namespace
             
             log_info "Hadoop集群已强制卸载"
         else
@@ -191,6 +201,305 @@ cleanup_resources() {
     log_info "残留资源清理完成"
 }
 
+# 创建本地PV
+create_local_pvs() {
+    local namespace=${1:-default}
+    
+    log_info "创建本地持久化卷..."
+    
+    # 获取节点列表
+    local nodes=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+    local node_array=($nodes)
+    local node_count=${#node_array[@]}
+    
+    if [ $node_count -lt 2 ]; then
+        log_error "需要至少2个节点来部署Hadoop集群"
+        exit 1
+    fi
+    
+    log_info "检测到节点: ${node_array[*]}"
+    
+    # 创建PV配置文件，使用命名空间前缀避免冲突
+    cat > /tmp/local-pvs-${namespace}.yaml << EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-nn-pv-0
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-nn-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-nn-pv-1
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-nn-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[1]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-nn-pv-2
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-nn-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-dn-pv-0
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-dn-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-dn-pv-1
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-dn-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[1]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-dn-pv-2
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-dn-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-jn-pv-0
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-jn-0
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-jn-pv-1
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-jn-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[1]}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${namespace}-hadoop-jn-pv-2
+  labels:
+    namespace: ${namespace}
+    app: hadoop
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/data/${namespace}/hadoop-jn-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${node_array[0]}
+EOF
+
+    # 在节点上创建目录
+    log_info "在节点上创建存储目录..."
+    for node in "${node_array[@]}"; do
+        if [ "$node" = "${node_array[0]}" ]; then
+            # 第一个节点
+            ssh $node "sudo mkdir -p /mnt/data/${namespace}/hadoop-nn-0 /mnt/data/${namespace}/hadoop-nn-2 /mnt/data/${namespace}/hadoop-dn-0 /mnt/data/${namespace}/hadoop-dn-2 /mnt/data/${namespace}/hadoop-jn-0 /mnt/data/${namespace}/hadoop-jn-2 && sudo chmod 777 /mnt/data/${namespace}/hadoop-*" 2>/dev/null || log_warn "无法在节点 $node 上创建目录，请手动创建"
+        else
+            # 第二个节点
+            ssh $node "sudo mkdir -p /mnt/data/${namespace}/hadoop-nn-1 /mnt/data/${namespace}/hadoop-dn-1 /mnt/data/${namespace}/hadoop-jn-1 && sudo chmod 777 /mnt/data/${namespace}/hadoop-*" 2>/dev/null || log_warn "无法在节点 $node 上创建目录，请手动创建"
+        fi
+    done
+    
+    # 应用PV配置
+    kubectl apply -f /tmp/local-pvs-${namespace}.yaml
+    
+    # 验证PV创建
+    if kubectl get pv | grep -q hadoop; then
+        log_info "本地PV创建成功"
+    else
+        log_error "PV创建失败"
+        exit 1
+    fi
+}
+
+# 删除本地PV
+delete_local_pvs() {
+    local namespace=${1:-default}
+    log_info "删除本地持久化卷..."
+    
+    # 删除指定命名空间的PV
+    kubectl delete pv -l namespace=${namespace},app=hadoop 2>/dev/null || true
+    
+    # 获取节点列表
+    local nodes=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
+    local node_array=($nodes)
+    
+    # 清理节点上的目录
+    log_info "清理节点上的存储目录..."
+    for node in "${node_array[@]}"; do
+        ssh $node "sudo rm -rf /mnt/data/${namespace}/hadoop-*" 2>/dev/null || log_warn "无法清理节点 $node 上的目录"
+    done
+    
+    log_info "本地PV清理完成"
+}
+
 # 显示帮助信息
 show_help() {
     echo "Hadoop Helm Chart 部署脚本"
@@ -198,7 +507,7 @@ show_help() {
     echo "用法: $0 [命令] [选项]"
     echo ""
     echo "命令:"
-    echo "  deploy   部署Hadoop集群"
+    echo "  deploy   部署Hadoop集群（自动创建本地PV）"
     echo "  upgrade  升级Hadoop集群"
     echo "  uninstall 卸载Hadoop集群"
     echo "  cleanup  清理残留资源"
@@ -208,15 +517,21 @@ show_help() {
     echo "选项:"
     echo "  -r, --release NAME    Release名称 (默认: hadoop-cluster)"
     echo "  -n, --namespace NAME  命名空间 (默认: default)"
-    echo "  --force              强制清理（用于卸载时）"
+    echo "  --force              强制清理（用于卸载时，包括本地PV）"
     echo ""
     echo "示例:"
     echo "  $0 deploy                    # 部署到默认命名空间"
-    echo "  $0 deploy -n hadoop         # 部署到hadoop命名空间"
+    echo "  $0 deploy -n hadoop         # 部署到hadoop命名空间（自动创建PV）"
     echo "  $0 upgrade -r my-hadoop     # 升级名为my-hadoop的集群"
     echo "  $0 uninstall -n hadoop      # 卸载hadoop命名空间的集群"
-    echo "  $0 uninstall -n hadoop --force  # 强制卸载（包括PVC）"
+    echo "  $0 uninstall -n hadoop --force  # 强制卸载（包括PVC和本地PV）"
     echo "  $0 cleanup -n hadoop        # 清理残留资源"
+    echo ""
+    echo "特性:"
+    echo "  - 自动检测local-storage存储类"
+    echo "  - 自动创建本地持久化卷"
+    echo "  - 自动在节点上创建存储目录"
+    echo "  - 卸载时自动清理PV和存储目录"
 }
 
 # 查看集群状态

@@ -37,22 +37,22 @@ hdfs:
 
 persistence:
   nameNode:
-    enabled: true  # 启用namenode持久化
+    enabled: true  # 重新启用namenode持久化
     size: "10Gi"
     accessMode: "ReadWriteOnce"
-    storageClass: ""  # 使用默认存储类
+    storageClass: "local-storage"  # 指定使用local-storage
 
   dataNode:
-    enabled: true  # 启用datanode持久化
+    enabled: true  # 重新启用datanode持久化
     size: "20Gi"
     accessMode: "ReadWriteOnce"
-    storageClass: ""  # 使用默认存储类
+    storageClass: "local-storage"  # 指定使用local-storage
 
   journalNode:
-    enabled: true  # 启用JournalNode持久化
+    enabled: true  # 重新启用JournalNode持久化
     size: "5Gi"
     accessMode: "ReadWriteOnce"
-    storageClass: ""  # 使用默认存储类
+    storageClass: "local-storage"  # 指定使用local-storage
 
 image:
   repository: hadoop-xxt
