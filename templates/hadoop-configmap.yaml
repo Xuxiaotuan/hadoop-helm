@@ -117,11 +117,8 @@ data:
       "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
-    if [[ $1 == "-d" ]]; then
-      log "INFO" "保持容器运行"
-      tail -F "${HADOOP_HOME}/logs/"* &
-      wait $!
-    elif [[ $1 == "-bash" ]]; then
+    # 保持容器运行的 -d 分支和 tail/wait 逻辑全部删除
+    if [[ $1 == "-bash" ]]; then
       /bin/bash
     fi
 
