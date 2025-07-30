@@ -223,6 +223,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: namenode
 spec:
   capacity:
     storage: 10Gi
@@ -249,6 +250,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: namenode
 spec:
   capacity:
     storage: 10Gi
@@ -275,6 +277,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: namenode
 spec:
   capacity:
     storage: 10Gi
@@ -301,6 +304,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: datanode
 spec:
   capacity:
     storage: 20Gi
@@ -327,6 +331,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: datanode
 spec:
   capacity:
     storage: 20Gi
@@ -353,6 +358,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: datanode
 spec:
   capacity:
     storage: 20Gi
@@ -379,6 +385,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: journalnode
 spec:
   capacity:
     storage: 5Gi
@@ -405,6 +412,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: journalnode
 spec:
   capacity:
     storage: 5Gi
@@ -431,6 +439,7 @@ metadata:
   labels:
     namespace: ${namespace}
     app: hadoop
+    type: journalnode
 spec:
   capacity:
     storage: 5Gi
