@@ -1,72 +1,58 @@
-image:
-  repository: docker.ssc-hn.com/bigdata/ssc-hadoop
-  tag: v3.3.6
-  pullPolicy: IfNotPresent
-
-# The version of the hadoop libraries being used in the image.
-hadoopVersion: 3.3.6
 logLevel: INFO
 
-# Select antiAffinity as either hard or soft, default is soft
-antiAffinity: "hard"
+antiAffinity: "soft"  # 最简单部署，不考虑强分布
 
 hdfs:
-  clusterName: "ssc-hadoop"
+  clusterName: "min-hadoop"
+
+  rpcAddress: "min-hadoop-hdfs-nn-0:9000"  # ➤ 关键：用于 core-site.xml fs.defaultFS 多NN模式
+
   nameNode:
-    pdbMinAvailable: 1
+    replicas: 3  # 修改为3个namenode
     resources:
       requests:
-        memory: "256Mi"
-        cpu: "10m"
+        memory: "512Mi"
+        cpu: "50m"
       limits:
-        memory: "2048Mi"
-        cpu: "1000m"
-    zookeeperQuorum: "zookeeper.zookeeper.svc.cluster.local"
-
+        memory: "1Gi"
+        cpu: "500m"
+    zookeeperQuorum: ""  # 不使用 zk，禁用 HA
 
   dataNode:
-    # Will be used as dfs.datanode.hostname
-    # You still need to set up services + ingress for every DN
-    # Datanodes will expect to
-    externalHostname: ssc-hn-hadoop.com
-    replicas: 3
-    pdbMinAvailable: 2
+    replicas: 3  # 修改为3个datanode
     resources:
       requests:
-        memory: "256Mi"
-        cpu: "10m"
+        memory: "512Mi"
+        cpu: "50m"
       limits:
-        memory: "2048Mi"
-        cpu: "1000m"
+        memory: "1Gi"
+        cpu: "500m"
+
+  replication: 3  # 修改复制因子为3
   webhdfs:
-    enabled: true
+    enabled: false
 
   journalNode:
-    replicas: 3
-    pdbMinAvailable: 2
-    resources:
-      requests:
-        memory: "256Mi"
-        cpu: "10m"
-      limits:
-        memory: "2048Mi"
-        cpu: "1000m"
+    replicas: 0  # 完全禁用 JN
 
 persistence:
   nameNode:
-    enabled: true
-    storageClass: "directpv-min-io"
-    accessMode: ReadWriteOnce
-    size: 5Gi
+    enabled: true  # 启用namenode持久化
+    size: "10Gi"
+    accessMode: "ReadWriteOnce"
+    storageClass: ""  # 使用默认存储类
 
   dataNode:
-    enabled: true
-    storageClass: "directpv-min-io"
-    accessMode: ReadWriteOnce
-    size: 5Gi
+    enabled: true  # 启用datanode持久化
+    size: "20Gi"
+    accessMode: "ReadWriteOnce"
+    storageClass: ""  # 使用默认存储类
 
   journalNode:
-    enabled: true
-    storageClass: "directpv-min-io"
-    accessMode: ReadWriteOnce
-    size: 2Gi
+    enabled: false
+
+image:
+  repository: hadoop-xxt
+  tag: "3.3.6"
+  pullPolicy: IfNotPresent
+

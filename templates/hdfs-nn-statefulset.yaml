@@ -1,39 +1,35 @@
-# NameNode的StatefulSet配置，管理HDFS主节点（元数据管理），双副本实现高可用
+# NameNode 的 StatefulSet 配置，管理 HDFS 主节点（负责元数据）
+# 单节点非 HA 最简部署
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "hadoop.fullname" . }}-hdfs-nn  # 唯一名称
+  name: {{ include "hadoop.fullname" . }}-hdfs-nn
   annotations:
-    # 配置文件哈希值，用于检测配置变更触发滚动更新
     checksum/config: {{ include (print $.Template.BasePath "/hadoop-configmap.yaml") . | sha256sum }}
   labels:
     app.kubernetes.io/name: {{ include "hadoop.name" . }}
     helm.sh/chart: {{ include "hadoop.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: hdfs-nn  # 组件标签
+    app.kubernetes.io/component: hdfs-nn
 spec:
+  serviceName: {{ include "hadoop.fullname" . }}-hdfs-nn
+  replicas: {{ .Values.hdfs.nameNode.replicas }}  # 支持多个namenode副本
   selector:
     matchLabels:
-      # 匹配NameNode Pod的标签
       app.kubernetes.io/name: {{ include "hadoop.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: hdfs-nn
-  serviceName: {{ include "hadoop.fullname" . }}-hdfs-nn  # 关联的无头服务，用于稳定DNS
-  replicas: 2  # 固定2副本（主从架构，active/standby）
   template:
     metadata:
       labels:
-        # Pod标签，需与selector匹配
         app.kubernetes.io/name: {{ include "hadoop.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: hdfs-nn
-
     spec:
-      serviceAccountName: {{ include "hadoop.fullname" . }}-hdfs-nn  # 关联的ServiceAccount（用于RBAC权限）
+      serviceAccountName: {{ include "hadoop.fullname" . }}-hdfs-nn
       affinity:
         podAntiAffinity:
         {{- if eq .Values.antiAffinity "hard" }}
-          # 硬反亲和性：强制两个NN分布在不同节点（避免单点故障）
           requiredDuringSchedulingIgnoredDuringExecution:
             - topologyKey: "kubernetes.io/hostname"
               labelSelector:
@@ -42,7 +38,6 @@ spec:
                   app.kubernetes.io/instance: {{ .Release.Name }}
                   app.kubernetes.io/component: hdfs-nn
         {{- else if eq .Values.antiAffinity "soft" }}
-          # 软反亲和性：优先分布在不同节点
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 5
               podAffinityTerm:
@@ -53,47 +48,49 @@ spec:
                     app.kubernetes.io/instance: {{ .Release.Name }}
                     app.kubernetes.io/component: hdfs-nn
         {{- end }}
-      terminationGracePeriodSeconds: 0  # 终止宽限期
+      terminationGracePeriodSeconds: 0
       containers:
-        - name: hdfs-nn  # 容器名称
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"  # 镜像地址
-          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}  # 镜像拉取策略
+        - name: hdfs-nn
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           command:
             - "/bin/bash"
-            - "/tmp/hadoop-config/bootstrap.sh"  # 启动脚本
-            - "-zkfc"  # 启动ZKFC（ZooKeeper故障转移控制器，用于NN主从切换）
-            - "-d"  # 后台运行并tail日志
+            - "/tmp/hadoop-config/bootstrap.sh"
+            - "-d"  # ✅ 去掉 -zkfc，非HA模式
           resources:
-{{ toYaml .Values.hdfs.nameNode.resources | indent 10 }}  # 资源限制（NN为核心组件，资源通常高于DN）
+{{ toYaml .Values.hdfs.nameNode.resources | indent 12 }}
           readinessProbe:
-            # 就绪探针：检测NN WebUI（9870端口）是否就绪
             httpGet:
               path: /
               port: 9870
-            initialDelaySeconds: 90  # NN启动较慢，延长初始化等待时间
-            periodSeconds: 10  # 检测周期
+            initialDelaySeconds: 90
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3  # 允许3次失败
+            failureThreshold: 3
           livenessProbe:
-            # 存活探针：检测NN是否存活
             httpGet:
               path: /
               port: 9870
-            initialDelaySeconds: 120  # 确保服务完全就绪后再检测
+            initialDelaySeconds: 120
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
           volumeMounts:
-            - name: hadoop-config  # 挂载配置文件
+            - name: hadoop-config
               mountPath: /tmp/hadoop-config
-            - name: dfs  # 挂载NN元数据存储目录
+            - name: dfs
               mountPath: /root/hdfs/namenode
       volumes:
-        - name: hadoop-config  # 配置文件卷（configmap）
+        - name: hadoop-config
           configMap:
             name: {{ include "hadoop.fullname" . }}
-      {{- if .Values.persistence.nameNode.enabled }}
-  # 持久化存储声明模板（NN元数据需持久化，避免数据丢失）
+
+        {{- if not .Values.persistence.nameNode.enabled }}
+        # ➤ 未启用持久化时使用 emptyDir
+        - name: dfs
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.persistence.nameNode.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: dfs
@@ -104,19 +101,16 @@ spec:
           app.kubernetes.io/component: hdfs-nn
       spec:
         accessModes:
-          - {{ .Values.persistence.nameNode.accessMode | quote }}  # 访问模式
+          - {{ .Values.persistence.nameNode.accessMode | quote }}
         resources:
           requests:
-            storage: {{ .Values.persistence.nameNode.size | quote }}  # 存储大小
-    {{- if .Values.persistence.nameNode.storageClass }}
-    {{- if (eq "-" .Values.persistence.nameNode.storageClass) }}
+            storage: {{ .Values.persistence.nameNode.size | quote }}
+        {{- if .Values.persistence.nameNode.storageClass }}
+        {{- if eq .Values.persistence.nameNode.storageClass "-" }}
         storageClassName: ""
-    {{- else }}
+        {{- else }}
         storageClassName: "{{ .Values.persistence.nameNode.storageClass }}"
-    {{- end }}
-    {{- end }}
-     {{- else }}
-        # 不启用持久化时使用emptyDir（仅测试环境，生产环境必须启用持久化）
-      - name: dfs
-        emptyDir: { }
-     {{- end }}
+        {{- end }}
+        {{- end }}
+  {{- end }}
+
