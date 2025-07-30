@@ -79,7 +79,7 @@ spec:
             - name: hadoop-config
               mountPath: /tmp/hadoop-config
             - name: dfs
-              mountPath: /root/hdfs/namenode
+              mountPath: /data/hdfs/namenode
       volumes:
         - name: hadoop-config
           configMap:
@@ -105,12 +105,11 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.nameNode.size | quote }}
-        {{- if .Values.persistence.nameNode.storageClass }}
-        {{- if eq .Values.persistence.nameNode.storageClass "-" }}
-        storageClassName: ""
-        {{- else }}
-        storageClassName: "{{ .Values.persistence.nameNode.storageClass }}"
-        {{- end }}
-        {{- end }}
+        storageClassName: {{ .Values.persistence.nameNode.storageClass | quote }}
+        selector:
+          matchLabels:
+            app: hadoop
+            type: namenode
+            pvIndex: "{{ .Ordinal }}"
   {{- end }}
 

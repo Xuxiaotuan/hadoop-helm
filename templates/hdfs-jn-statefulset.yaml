@@ -116,12 +116,11 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.journalNode.size | quote }}
-        {{- if .Values.persistence.journalNode.storageClass }}
-        {{- if (eq .Values.persistence.journalNode.storageClass "-") }}
-        storageClassName: ""
-        {{- else }}
-        storageClassName: "{{ .Values.persistence.journalNode.storageClass }}"
-        {{- end }}
-        {{- end }}
+        storageClassName: {{ .Values.persistence.journalNode.storageClass | quote }}
+        selector:
+          matchLabels:
+            app: hadoop
+            type: journalnode
+            pvIndex: "{{ .Ordinal }}"
   {{- end }}
 

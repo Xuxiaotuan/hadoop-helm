@@ -28,12 +28,19 @@ hdfs:
         memory: "1Gi"
         cpu: "500m"
 
+  journalNode:
+    replicas: 3  # 启用3个JournalNode
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "25m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+
   replication: 3  # 修改复制因子为3
   webhdfs:
     enabled: false
-
-  journalNode:
-    replicas: 3  # 启用3个JournalNode
 
 persistence:
   nameNode:

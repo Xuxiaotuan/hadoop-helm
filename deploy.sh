@@ -224,6 +224,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: namenode
+    pvIndex: "0"
 spec:
   capacity:
     storage: 10Gi
@@ -251,6 +252,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: namenode
+    pvIndex: "1"
 spec:
   capacity:
     storage: 10Gi
@@ -278,6 +280,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: namenode
+    pvIndex: "2"
 spec:
   capacity:
     storage: 10Gi
@@ -305,6 +308,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: datanode
+    pvIndex: "0"
 spec:
   capacity:
     storage: 20Gi
@@ -332,6 +336,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: datanode
+    pvIndex: "1"
 spec:
   capacity:
     storage: 20Gi
@@ -359,6 +364,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: datanode
+    pvIndex: "2"
 spec:
   capacity:
     storage: 20Gi
@@ -386,6 +392,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: journalnode
+    pvIndex: "0"
 spec:
   capacity:
     storage: 5Gi
@@ -413,6 +420,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: journalnode
+    pvIndex: "1"
 spec:
   capacity:
     storage: 5Gi
@@ -440,6 +448,7 @@ metadata:
     namespace: ${namespace}
     app: hadoop
     type: journalnode
+    pvIndex: "2"
 spec:
   capacity:
     storage: 5Gi

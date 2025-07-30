@@ -108,12 +108,11 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.dataNode.size | quote }}
-{{- if .Values.persistence.dataNode.storageClass }}
-{{- if (eq "-" .Values.persistence.dataNode.storageClass) }}
-        storageClassName: ""
-{{- else }}
-        storageClassName: "{{ .Values.persistence.dataNode.storageClass }}"
-{{- end }}
-{{- end }}
+        storageClassName: {{ .Values.persistence.dataNode.storageClass | quote }}
+        selector:
+          matchLabels:
+            app: hadoop
+            type: datanode
+            pvIndex: "{{ .Ordinal }}"
 {{- end }}
 
