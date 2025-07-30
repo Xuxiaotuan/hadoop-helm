@@ -139,27 +139,27 @@ data:
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
     </configuration>
 
@@ -208,27 +208,27 @@ data:
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.rpc-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2:9000</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9000</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn0</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-0.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn1</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-1.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ .Values.hdfs.clusterName }}.nn2</name>
-        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2:9870</value>
+        <value>{{ include "hadoop.fullname" . }}-hdfs-nn-2.{{ include "hadoop.fullname" . }}-hdfs-nn:9870</value>
       </property>
     </configuration>
 
