@@ -25,6 +25,10 @@ data:
 
     log "INFO" "启动Hadoop组件初始化，HADOOP_HOME=${HADOOP_HOME}"
 
+    # 保证日志目录存在且有权限
+    mkdir -p /opt/hadoop/logs
+    chmod 777 /opt/hadoop/logs
+
     if [ -f "${HADOOP_HOME}/etc/hadoop/hadoop-env.sh" ]; then
       . "${HADOOP_HOME}/etc/hadoop/hadoop-env.sh"
     else
