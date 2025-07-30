@@ -86,7 +86,7 @@ data:
       nn_ready=false
       REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
       for i in $(seq 0 $((REPLICA_COUNT - 1))); do
-        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}}.{{ include "hadoop.fullname" . }}-hdfs-nn"
+        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
         tmp_url="http://${nn_service}:${NN_WEB_PORT}"
         for retry in {1..24}; do
           if curl -sf "${tmp_url}"; then
@@ -96,6 +96,9 @@ data:
           fi
           sleep 5
         done
+        if [ "$nn_ready" = true ]; then
+          break
+        fi
       done
 
       if [ "$nn_ready" = true ]; then
@@ -152,7 +155,7 @@ data:
     <configuration>
       <property>
         <name>dfs.replication</name>
-        <value>{{ .Values.hdfs.replication | default 1 }}</value>
+        <value>{{ .Values.hdfs.replication | default 3 }}</value>
       </property>
       <property>
         <name>dfs.webhdfs.enabled</name>
@@ -216,5 +219,5 @@ data:
 
   slaves: |
 {{- range $i, $e := until (.Values.hdfs.dataNode.replicas | int) }}
-    {{ include "hadoop.fullname" $ }}-hdfs-dn-{{ $i }}
+{{ include "hadoop.fullname" $ }}-hdfs-dn-{{ $i }}
 {{- end }}
