@@ -60,7 +60,7 @@ data:
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
 
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
-      export HADOOP_NAMENODE_OPTS="$HADOOP_NAMENODE_OPTS -Ddfs.ha.namenode.id=nn${nn_index}"
+      export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
 
       if [ ! -f /data/hdfs/namenode/formated ]; then
         if [ "$nn_index" = "0" ]; then
