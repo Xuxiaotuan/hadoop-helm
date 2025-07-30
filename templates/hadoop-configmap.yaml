@@ -83,6 +83,10 @@ data:
       log "INFO" "启动DataNode"
       mkdir -p /data/hdfs/datanode
       
+      # 补充端口替换
+      sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+
       # 等待任意一个namenode就绪
       nn_services=("{{ include "hadoop.fullname" . }}-hdfs-nn-0" "{{ include "hadoop.fullname" . }}-hdfs-nn-1" "{{ include "hadoop.fullname" . }}-hdfs-nn-2")
       nn_ready=false
