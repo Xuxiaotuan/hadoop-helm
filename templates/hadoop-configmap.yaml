@@ -51,7 +51,7 @@ data:
 
     if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
       log "INFO" "启动NameNode"
-      mkdir -p /data/hdfs/namenode && chmod 700 /data/hdfs/namenode
+      mkdir -p /data/hdfs/namenode
 
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
@@ -76,7 +76,7 @@ data:
 
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
       log "INFO" "启动DataNode"
-      mkdir -p /data/hdfs/datanode && chmod 700 /data/hdfs/datanode
+      mkdir -p /data/hdfs/datanode
       
       # 等待任意一个namenode就绪
       nn_services=("{{ include "hadoop.fullname" . }}-hdfs-nn-0" "{{ include "hadoop.fullname" . }}-hdfs-nn-1" "{{ include "hadoop.fullname" . }}-hdfs-nn-2")
@@ -101,7 +101,7 @@ data:
 
     if [[ "${HOSTNAME}" =~ "hdfs-jn" ]]; then
       log "INFO" "启动JournalNode"
-      mkdir -p /data/hdfs/journalnode && chmod 700 /data/hdfs/journalnode
+      mkdir -p /data/hdfs/journalnode
       
       # 启动JournalNode
       "${HADOOP_HOME}/bin/hdfs" --loglevel {{ .Values.logLevel }} --daemon start journalnode

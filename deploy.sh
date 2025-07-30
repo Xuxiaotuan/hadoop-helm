@@ -198,6 +198,21 @@ cleanup_resources() {
     # 删除所有Secret
     kubectl delete secret --all -n $namespace --force --grace-period=0 2>/dev/null || true
     
+    # 删除所有Ingress
+    kubectl delete ingress --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有NetworkPolicy
+    kubectl delete networkpolicy --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有RoleBinding
+    kubectl delete rolebinding --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有Role
+    kubectl delete role --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
+    # 删除所有ServiceAccount
+    kubectl delete serviceaccount --all -n $namespace --force --grace-period=0 2>/dev/null || true
+    
     log_info "残留资源清理完成"
 }
 
