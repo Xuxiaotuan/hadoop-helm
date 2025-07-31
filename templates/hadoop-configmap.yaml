@@ -373,7 +373,7 @@ data:
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
-        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn.{{ $.Release.Namespace }}.svc.cluster.local:9870</value>
+        <value>0.0.0.0:9870</value>
       </property>
       {{- end }}
       <property>
@@ -412,6 +412,7 @@ data:
         <name>dfs.namenode.rpc-bind-host</name>
         <value>0.0.0.0</value>
       </property>
+
     </configuration>
 
   slaves: |

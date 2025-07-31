@@ -42,188 +42,168 @@
 - 默认StorageClass已配置
 - 节点满足资源要求
 
-## 部署流程详解
+## 快速开始
 
-### 1. 使用部署脚本（推荐方法）
+### 1. 使用部署脚本（推荐）
 
-部署脚本 `deploy.sh` 提供完整的集群生命周期管理功能。脚本执行以下操作：
-
-#### 步骤1: 授予执行权限
 ```bash
+# 授予脚本执行权限
 chmod +x deploy.sh
-```
 
-#### 步骤2: 部署集群到hadoop命名空间
-```bash
+# 部署集群到hadoop命名空间
 ./deploy.sh deploy -n hadoop
+
+# 检查集群状态
+./deploy.sh status -n hadoop
 ```
 
 **执行过程**:
 1. 创建命名空间（如果不存在）
-2. 检查并创建本地PV（使用local-storage存储类）
-3. 在节点上创建存储目录：
-   - `/mnt/hadoop/namenode`
-   - `/mnt/hadoop/datanode`
-   - `/mnt/hadoop/journalnode`
-4. 使用Helm安装Hadoop集群
-5. 等待所有Pod就绪（最长等待10分钟）
+2. 自动创建本地PV和存储目录
+3. 安装Hadoop集群
+4. 等待所有Pod就绪（约2-5分钟）
 
 **预期结果**:
-- 输出: "Hadoop cluster deployed successfully in namespace hadoop"
-- 3个NameNode Pod（1个active，2个standby）
-- 3个DataNode Pod
-- 3个JournalNode Pod
+- 输出: "Hadoop cluster deployed successfully"
 - 所有Pod状态为Running
+- HDFS集群准备就绪
 
-#### 步骤3: 验证集群状态
+**验证部署成功**:
 ```bash
+# 检查集群状态
 ./deploy.sh status -n hadoop
+
+# 预期输出示例:
+# === Pod状态 ===
+# NAME                              READY   STATUS    RESTARTS   AGE
+# hadoop-cluster-hadoop-hdfs-dn-0   1/1     Running   0          14m
+# hadoop-cluster-hadoop-hdfs-dn-1   1/1     Running   0          5m35s
+# hadoop-cluster-hadoop-hdfs-dn-2   1/1     Running   0          4m31s
+# hadoop-cluster-hadoop-hdfs-jn-0   1/1     Running   0          14m
+# hadoop-cluster-hadoop-hdfs-jn-1   1/1     Running   0          12m
+# hadoop-cluster-hadoop-hdfs-jn-2   1/1     Running   0          10m
+# hadoop-cluster-hadoop-hdfs-nn-0   1/1     Running   0          14m
+# hadoop-cluster-hadoop-hdfs-nn-1   1/1     Running   0          7m5s
+
+# === 服务状态 ===
+# hadoop-cluster-hadoop-hdfs-nn-active   NodePort   10.233.27.125   <none>   9000:30900/TCP,9870:30987/TCP   14m
 ```
 
-**执行过程**:
-1. 检查命名空间是否存在
-2. 列出所有相关Pod的状态
-3. 显示PVC/PV绑定状态
-4. 显示存储使用情况
+### 2. 访问集群
+
+#### 验证集群状态
+```bash
+# 检查NameNode HA状态
+kubectl exec -it hadoop-cluster-hadoop-hdfs-nn-0 -n hadoop -- hdfs haadmin -getServiceState nn0
+# 输出: active
+
+kubectl exec -it hadoop-cluster-hadoop-hdfs-nn-1 -n hadoop -- hdfs haadmin -getServiceState nn1  
+# 输出: standby
+
+# 检查DataNode注册状态
+kubectl exec -it hadoop-cluster-hadoop-hdfs-nn-0 -n hadoop -- hdfs dfsadmin -report
+```
 
 **预期结果**:
-```
-NAMESPACE: hadoop
-PODS:
-NAME                            READY   STATUS    RESTARTS   AGE
-hadoop-datanode-0              1/1     Running   0          2m
-hadoop-datanode-1              1/1     Running   0          2m
-hadoop-datanode-2              1/1     Running   0          2m
-hadoop-journalnode-0           1/1     Running   0          2m
-hadoop-journalnode-1           1/1     Running   0          2m
-hadoop-journalnode-2           1/1     Running   0          2m
-hadoop-namenode-0              1/1     Running   0          2m
-hadoop-namenode-1              1/1     Running   0          2m
+- nn0为active状态，nn1为standby状态
+- 所有DataNode正常注册（3个DataNode）
+- 总容量约2.45TB，可用容量约1.99TB
 
-STORAGE:
-NAME                                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES
-persistentvolumeclaim/datanode-hadoop   Bound    pvc-df4e3f2e-...                           20Gi       RWO
-...
-```
-
-#### 步骤4: 访问HDFS集群
+#### 测试HDFS功能
 ```bash
-# 获取active NameNode的Pod名称
-ACTIVE_NN=$(kubectl get pod -n hadoop -l app.kubernetes.io/component=namenode -o jsonpath='{.items[?(@.metadata.annotations.hdfs\.namenode\.ha\.state=="active")].metadata.name}')
+# 进入NameNode容器
+kubectl exec -it hadoop-cluster-hadoop-hdfs-nn-0 -n hadoop -- bash
 
-# 进入容器执行HDFS命令
-kubectl exec -it -n hadoop $ACTIVE_NN -- bash
-
-# 在容器内创建测试目录
+# 创建测试目录
 hdfs dfs -mkdir /test
 
-# 在容器内上传文件
-hdfs dfs -put /etc/hosts /test/hosts
+# 创建测试文件
+echo "Hello Hadoop" | hdfs dfs -put - /test/hello.txt
 
-# 在容器内查看文件
+# 查看文件内容
+hdfs dfs -cat /test/hello.txt
+# 输出: Hello Hadoop
+
+# 列出目录内容
 hdfs dfs -ls /test
+# 输出: Found 1 items -rw-r--r-- 3 hadoop supergroup 13 2025-07-31 15:43 /test/hello.txt
 ```
 
 **预期结果**:
-```
-Found 1 items
--rw-r--r--   3 root supergroup        221 2023-07-31 08:15 /test/hosts
-```
+- 成功创建目录和文件
+- 文件内容正确
+- 权限和元数据正常
 
-#### 步骤5: 故障转移测试
+### 3. 管理集群
+
 ```bash
-# 手动触发故障转移
-kubectl exec -it -n hadoop hadoop-namenode-0 -- hdfs haadmin -failover active standby
-
-# 验证新的active NameNode
-kubectl get pod -n hadoop -l app.kubernetes.io/component=namenode -o jsonpath='{.items[*].metadata.annotations.hdfs\.namenode\.ha\.state}'
-```
-
-**预期结果**:
-```
-"standby" "active" # 显示新的active节点
-```
-
-#### 步骤6: 扩容DataNode
-1. 编辑 `values.yaml`:
-```yaml
-hdfs:
-  dataNode:
-    replicas: 5  # 从3增加到5
-```
-2. 执行升级:
-```bash
+# 升级配置
 ./deploy.sh upgrade -n hadoop
-```
 
-**预期结果**:
-- 新增2个DataNode Pod
-- 集群自动识别新节点
-- HDFS容量增加
-
-#### 步骤7: 卸载集群
-```bash
-# 普通卸载（保留数据）
+# 卸载集群（保留数据）
 ./deploy.sh uninstall -n hadoop
 
-# 强制卸载（清除所有数据）
+# 完全清除（删除所有数据）
 ./deploy.sh uninstall -n hadoop --force
 ```
 
-**执行过程**:
-1. Helm卸载应用
-2. 删除PVC（普通卸载保留）
-3. 删除PV（普通卸载保留）
-4. 清理节点存储目录（仅--force时）
-5. 删除命名空间（仅--force时）
-
-### 2. 直接使用Helm命令（高级用户）
-
-适合需要更多控制权的用户：
-
-```bash
-# 赋予脚本执行权限
-chmod +x deploy.sh
-
-# 部署到hadoop命名空间（自动创建本地PV）
-./deploy.sh deploy -n hadoop
-
-# 查看集群状态
-./deploy.sh status -n hadoop
-
-# 升级集群
-./deploy.sh upgrade -n hadoop
-
-# 卸载集群（普通卸载）
-./deploy.sh uninstall -n hadoop
-
-# 强制卸载（清理所有残留，包括PVC和本地PV）
-./deploy.sh uninstall -n hadoop --force
-
-# 清理命名空间内所有残留资源
-./deploy.sh cleanup -n hadoop
-```
-
-### 2. 直接使用Helm命令
+### 4. 直接使用Helm命令（高级用户）
 
 ```bash
 # 创建命名空间
-kubectl create namespace hadoop
+kubectl create ns hadoop
 
-# 部署
-helm install hadoop-cluster ./ --namespace hadoop --wait --timeout 10m
+# 部署集群
+helm install hadoop-cluster ./ -n hadoop
 
-# 升级
-helm upgrade hadoop-cluster ./ --namespace hadoop --wait --timeout 10m
+# 升级集群
+helm upgrade hadoop-cluster ./ -n hadoop
 
-# 卸载
+# 卸载集群
 helm uninstall hadoop-cluster -n hadoop
 ```
 
-## 访问方式
-- NameNode Web UI: `http://<pod-ip>:9870`
-- DataNode Web UI: `http://<pod-ip>:9864`
-- HDFS RPC: `hdfs://<namenode-pod>:9000`
+## 详细部署指南
+
+对于更详细的部署说明、故障转移测试、扩容操作等，请参考下面的[详细部署步骤](#详细部署步骤)部分。
+
+
+
+## 访问集群
+
+### Web界面访问
+
+#### 方法1：端口转发（推荐）
+```bash
+# NameNode Web界面
+kubectl port-forward svc/hadoop-cluster-hadoop-hdfs-nn-active 9870:9870 -n hadoop
+```
+然后访问: `http://localhost:9870`
+
+#### 方法2：NodePort访问
+```bash
+# 获取节点IP
+kubectl get nodes -o wide
+
+# 使用节点IP访问
+http://<节点IP>:30987
+```
+
+#### 方法3：Java程序连接
+```java
+Configuration conf = new Configuration();
+// 使用端口转发
+conf.set("fs.defaultFS", "hdfs://localhost:9870");
+// 或使用NodePort
+conf.set("fs.defaultFS", "hdfs://<节点IP>:30900");
+FileSystem fs = FileSystem.get(conf);
+```
+
+### 服务端口说明
+- **NameNode Web UI**: `http://<pod-ip>:9870` (NodePort: 30987)
+- **NameNode RPC**: `hdfs://<pod-ip>:9000` (NodePort: 30900)
+- **DataNode Web UI**: `http://<pod-ip>:9864` (需要端口转发)
+- **JournalNode Web UI**: `http://<pod-ip>:8480` (需要端口转发)
 
 ## 注意事项
 1. 确保集群有足够的存储资源
@@ -236,7 +216,13 @@ helm uninstall hadoop-cluster -n hadoop
 8. 卸载时会自动清理PV和存储目录
 9. PV和存储目录使用命名空间前缀，避免与现有资源冲突
 
-## 配置参考
+## 详细部署步骤
+
+> 此部分提供更详细的部署和管理说明，适合需要深入了解操作细节的用户
+
+### 1. 使用部署脚本
+
+部署脚本 `deploy.sh` 提供完整的集群生命周期管理功能...
 
 ### 架构概述
 
@@ -438,6 +424,32 @@ kubectl exec -n hadoop <journalnode-pod> -- hdfs dfs -ls journalnode://hadoop-jo
 kubectl logs -n hadoop <pod-name> --tail 1000 | grep -i error
 ```
 
+### 成功部署验证
+
+当集群部署成功后，您应该看到：
+
+1. **所有Pod运行正常**：
+   - 3个DataNode Pod全部Running
+   - 3个JournalNode Pod全部Running  
+   - 2个NameNode Pod全部Running
+
+2. **HA状态正确**：
+   - nn0为active状态
+   - nn1为standby状态
+
+3. **DataNode注册成功**：
+   - 3个DataNode全部注册到NameNode
+   - 总容量约2.45TB，可用容量约1.99TB
+
+4. **HDFS功能正常**：
+   - 可以创建目录和文件
+   - 文件读写操作正常
+   - 权限和元数据正确
+
+5. **Web界面可访问**：
+   - 通过端口转发或NodePort可以访问NameNode Web界面
+   - 可以看到集群状态、DataNode列表等信息
+
 ### 获取帮助
 
 查看脚本内置帮助：
@@ -461,6 +473,6 @@ kubectl logs -l app.kubernetes.io/component=journalnode -n hadoop
 ## 贡献与支持
 
 如需报告问题或贡献代码，请访问项目仓库：
-https://github.com/your-repo/hadoop-helm
+https://github.com/Xuxiaotuan/hadoop-helm
 
-对于企业级支持需求，请联系：support@example.com
+对于企业级支持需求，请联系：jia_yangchen@163.com
