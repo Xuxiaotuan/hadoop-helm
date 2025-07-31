@@ -109,6 +109,9 @@ data:
       # 检查JournalNode是否已格式化
       if [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
         log "INFO" "格式化JournalNode存储目录"
+        # 确保目录存在
+        mkdir -p /data/hdfs/journalnode/min-hadoop
+        # 格式化JournalNode
         "${HADOOP_HOME}/bin/hdfs" journalnode -format
         log "INFO" "JournalNode格式化完成"
       else
@@ -117,7 +120,15 @@ data:
       
       log "INFO" "启动JournalNode服务"
       log "INFO" "JournalNode将在端口8480提供HTTP服务，8485提供RPC服务"
-      "${HADOOP_HOME}/bin/hdfs" journalnode
+      
+      # 验证格式化是否成功
+      if [ -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
+        log "INFO" "JournalNode格式化验证成功，启动服务"
+        "${HADOOP_HOME}/bin/hdfs" journalnode
+      else
+        log "ERROR" "JournalNode格式化失败，无法启动服务"
+        exit 1
+      fi
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
@@ -132,8 +143,7 @@ data:
       log "INFO" "更新DataNode端口配置"
 
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
-      export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
-      export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.namenode.rpc-bind-host=0.0.0.0 -Ddfs.namenode.http-bind-host=0.0.0.0"
+      export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index} -Ddfs.namenode.rpc-bind-host=0.0.0.0 -Ddfs.namenode.http-bind-host=0.0.0.0"
       log "INFO" "设置NameNode ID: nn${nn_index}"
       log "INFO" "设置NameNode绑定地址: 0.0.0.0"
       

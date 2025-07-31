@@ -10,13 +10,15 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: hdfs-nn
 spec:
+  type: NodePort  # 添加 NodePort 类型以支持外部访问
   ports:
     - name: dfs  # HDFS RPC端口（9000），用于客户端数据操作
       port: 9000
       protocol: TCP
+      nodePort: 30900  # 指定 NodePort 端口
     - name: webhdfs  # NN WebUI端口（9870），用于管理界面访问
       port: 9870
-  clusterIP: None  # 无头服务（直接访问活跃Pod）
+      nodePort: 30987  # 指定 NodePort 端口
   selector:
     # 核心：通过动态标签hdfs.nn.state=active匹配活跃NN（标签由bootstrap.sh维护）
     app.kubernetes.io/name: {{ include "hadoop.name" . }}
