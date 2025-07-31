@@ -106,7 +106,15 @@ data:
       mkdir -p /data/hdfs/journalnode
       log "INFO" "创建JournalNode数据目录: /data/hdfs/journalnode"
       
-      # 简化JournalNode启动逻辑，直接启动
+      # 检查JournalNode是否已格式化
+      if [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
+        log "INFO" "格式化JournalNode存储目录"
+        "${HADOOP_HOME}/bin/hdfs" journalnode -format
+        log "INFO" "JournalNode格式化完成"
+      else
+        log "INFO" "JournalNode已格式化，直接启动"
+      fi
+      
       log "INFO" "启动JournalNode服务"
       log "INFO" "JournalNode将在端口8480提供HTTP服务，8485提供RPC服务"
       "${HADOOP_HOME}/bin/hdfs" journalnode
@@ -125,7 +133,9 @@ data:
 
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
       export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
+      export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.namenode.rpc-bind-host=0.0.0.0 -Ddfs.namenode.http-bind-host=0.0.0.0"
       log "INFO" "设置NameNode ID: nn${nn_index}"
+      log "INFO" "设置NameNode绑定地址: 0.0.0.0"
       
       # 动态更新hdfs-site.xml中的namenode.id配置
       sed -i "s/nn\${nn_index}/nn${nn_index}/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
@@ -253,6 +263,10 @@ data:
         <value>0.0.0.0:EXTERNAL_DATA_PORT_REPLACEME</value>
       </property>
       <property>
+        <name>dfs.datanode.hostname</name>
+        <value>${HOSTNAME}</value>
+      </property>
+      <property>
         <name>dfs.nameservices</name>
         <value>{{ .Values.hdfs.clusterName }}</value>
       </property>
@@ -296,6 +310,10 @@ data:
       </property>
       <property>
         <name>dfs.namenode.https-bind-host</name>
+        <value>0.0.0.0</value>
+      </property>
+      <property>
+        <name>dfs.namenode.rpc-bind-host</name>
         <value>0.0.0.0</value>
       </property>
     </configuration>
