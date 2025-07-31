@@ -62,6 +62,11 @@ data:
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "更新配置文件端口配置"
+      
+      # 设置DataNode主机名
+      dn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
+      export HDFS_DATANODE_OPTS="${HDFS_DATANODE_OPTS:-} -Ddfs.datanode.hostname=${HOSTNAME}"
+      log "INFO" "设置DataNode主机名为: ${HOSTNAME}"
 
       log "INFO" "等待NameNode就绪..."
       nn_ready=false
@@ -171,7 +176,7 @@ data:
       log "INFO" "设置NameNode绑定地址: 0.0.0.0"
       
       # 动态更新hdfs-site.xml中的namenode.id配置
-      sed -i "s/nn\${nn_index}/nn${nn_index}/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      sed -i "s/<value>nn\${nn_index}<\/value>/<value>nn${nn_index}<\/value>/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "已更新hdfs-site.xml中的namenode.id为: nn${nn_index}"
 
       # 等待所有JournalNode就绪
@@ -237,7 +242,49 @@ data:
         export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
         
         # 启动NameNode
-        "${HADOOP_HOME}/bin/hdfs" namenode
+        "${HADOOP_HOME}/bin/hdfs" namenode &
+        namenode_pid=$!
+        
+        # 等待NameNode启动
+        log "INFO" "等待NameNode启动..."
+        for retry in {1..60}; do
+          if curl -sf "http://localhost:9870" >/dev/null 2>&1; then
+            log "INFO" "NameNode已启动，等待30秒确保完全就绪..."
+            sleep 30
+            break
+          else
+            log "INFO" "NameNode未就绪，继续等待 (重试 ${retry}/60)"
+            sleep 5
+          fi
+        done
+        
+        # 如果是第一个NameNode (nn0)，设置为Active
+        if [ "$nn_index" = "0" ]; then
+          log "INFO" "设置nn0为Active NameNode"
+          # 等待一段时间确保NameNode完全启动
+          sleep 10
+          
+          # 尝试设置Active状态
+          for retry in {1..30}; do
+            if "${HADOOP_HOME}/bin/hdfs" haadmin -transitionToActive nn0 -forceactive 2>/dev/null; then
+              log "INFO" "成功设置nn0为Active NameNode"
+              break
+            else
+              log "INFO" "设置Active失败，重试 (${retry}/30)"
+              sleep 5
+            fi
+          done
+          
+          # 验证状态
+          if "${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState nn0 2>/dev/null | grep -q "active"; then
+            log "INFO" "nn0 Active状态确认成功"
+          else
+            log "WARN" "nn0 Active状态确认失败，但继续运行"
+          fi
+        fi
+        
+        # 等待NameNode进程
+        wait $namenode_pid
       else
         log "ERROR" "JournalNode未就绪，NameNode无法启动"
         log "ERROR" "请检查JournalNode状态和网络连接"
@@ -316,12 +363,8 @@ data:
         <value>${HOSTNAME}</value>
       </property>
       <property>
-        <name>dfs.nameservices</name>
-        <value>{{ .Values.hdfs.clusterName }}</value>
-      </property>
-      <property>
-        <name>dfs.ha.namenodes.{{ .Values.hdfs.clusterName }}</name>
-        <value>{{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}{{ if $i }},{{ end }}nn{{ $i }}{{- end }}</value>
+        <name>dfs.namenode.datanode.registration.ip-hostname-check</name>
+        <value>false</value>
       </property>
       {{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}
       <property>
@@ -346,14 +389,6 @@ data:
         <value>shell(/bin/true)</value>
       </property>
       <property>
-        <name>dfs.ha.namenodes.{{ .Values.hdfs.clusterName }}</name>
-        <value>{{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}{{ if $i }},{{ end }}nn{{ $i }}{{- end }}</value>
-      </property>
-      <property>
-        <name>dfs.ha.namenode.id</name>
-        <value>nn${nn_index}</value>
-      </property>
-      <property>
         <name>dfs.ha.initialization.timeout</name>
         <value>300</value>
       </property>
@@ -364,10 +399,6 @@ data:
       <property>
         <name>dfs.ha.namenode.id</name>
         <value>nn${nn_index}</value>
-      </property>
-      <property>
-        <name>dfs.ha.initialization.timeout</name>
-        <value>300</value>
       </property>
       <property>
         <name>dfs.namenode.http-bind-host</name>
