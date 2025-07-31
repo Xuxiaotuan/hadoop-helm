@@ -65,19 +65,27 @@ data:
 
       log "INFO" "等待NameNode就绪..."
       nn_ready=false
-      nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn"
-      tmp_url="http://${nn_service}:${NN_WEB_PORT}"
-      log "INFO" "检测NameNode服务: ${nn_service}"
+      REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
+      log "INFO" "检测 ${REPLICA_COUNT} 个NameNode"
       
-      for retry in {1..60}; do
-        if curl -sf "${tmp_url}"; then
-          log "INFO" "NameNode服务 ${nn_service} 已就绪 (重试 ${retry}/60)"
-          nn_ready=true
+      for i in $(seq 0 $((REPLICA_COUNT - 1))); do
+        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
+        tmp_url="http://${nn_service}:${NN_WEB_PORT}"
+        log "INFO" "检测NameNode: ${nn_service}"
+        
+        for retry in {1..300}; do
+          if curl -sf "${tmp_url}"; then
+            log "INFO" "NameNode ${nn_service} 已就绪 (重试 ${retry}/300)"
+            nn_ready=true
+            break 2
+          else
+            log "INFO" "NameNode ${nn_service} 未就绪，继续等待 (重试 ${retry}/300)"
+          fi
+          sleep 10
+        done
+        if [ "$nn_ready" = true ]; then
           break
-        else
-          log "INFO" "NameNode服务 ${nn_service} 未就绪，继续等待 (重试 ${retry}/60)"
         fi
-        sleep 5
       done
 
       if [ "$nn_ready" = true ]; then
@@ -118,23 +126,35 @@ data:
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
       export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
       log "INFO" "设置NameNode ID: nn${nn_index}"
-
-      # 等待JournalNode就绪
-      log "INFO" "等待JournalNode就绪..."
-      jn_ready=false
-      jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn"
-      log "INFO" "检测JournalNode服务: ${jn_service}"
       
-      for retry in {1..60}; do
-        # 直接尝试连接，不依赖nslookup
-        if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
-          log "INFO" "JournalNode服务 ${jn_service} 端口连接成功 (重试 ${retry}/60)"
+      # 动态更新hdfs-site.xml中的namenode.id配置
+      sed -i "s/nn\${nn_index}/nn${nn_index}/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      log "INFO" "已更新hdfs-site.xml中的namenode.id为: nn${nn_index}"
+
+      # 等待所有JournalNode就绪
+      log "INFO" "等待所有JournalNode就绪..."
+      jn_ready=false
+      JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
+      log "INFO" "需要等待 ${JN_REPLICA_COUNT} 个JournalNode就绪"
+      
+      for retry in {1..600}; do
+        jn_ready_count=0
+        for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
+          jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
+          if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
+            log "INFO" "JournalNode ${jn_service} 已就绪"
+            jn_ready_count=$((jn_ready_count + 1))
+          fi
+        done
+        
+        if [ "$jn_ready_count" -eq "$JN_REPLICA_COUNT" ]; then
+          log "INFO" "所有 ${JN_REPLICA_COUNT} 个JournalNode都已就绪"
           jn_ready=true
           break
         else
-          log "INFO" "JournalNode服务 ${jn_service} 端口连接失败，继续等待 (重试 ${retry}/60)"
+          log "INFO" "当前有 ${jn_ready_count}/${JN_REPLICA_COUNT} 个JournalNode就绪，继续等待 (重试 ${retry}/600)"
         fi
-        sleep 5
+        sleep 10
       done
 
       if [ "$jn_ready" = true ]; then
