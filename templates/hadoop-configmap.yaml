@@ -278,6 +278,9 @@ data:
           # 验证状态
           if "${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState nn0 2>/dev/null | grep -q "active"; then
             log "INFO" "nn0 Active状态确认成功"
+            # 更新Pod标签为active
+            kubectl label pod "${HOSTNAME}" hdfs.nn.state=active --overwrite
+            log "INFO" "已更新Pod标签为active"
           else
             log "WARN" "nn0 Active状态确认失败，但继续运行"
           fi
