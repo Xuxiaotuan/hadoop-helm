@@ -65,27 +65,19 @@ data:
 
       log "INFO" "等待NameNode就绪..."
       nn_ready=false
-      REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
-      log "INFO" "检测 ${REPLICA_COUNT} 个NameNode"
+      nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn"
+      tmp_url="http://${nn_service}:${NN_WEB_PORT}"
+      log "INFO" "检测NameNode服务: ${nn_service}"
       
-      for i in $(seq 0 $((REPLICA_COUNT - 1))); do
-        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
-        tmp_url="http://${nn_service}:${NN_WEB_PORT}"
-        log "INFO" "检测NameNode: ${nn_service}"
-        
-        for retry in {1..60}; do
-          if curl -sf "${tmp_url}"; then
-            log "INFO" "NameNode ${nn_service} 已就绪 (重试 ${retry}/60)"
-            nn_ready=true
-            break 2
-          else
-            log "INFO" "NameNode ${nn_service} 未就绪，继续等待 (重试 ${retry}/60)"
-          fi
-          sleep 5
-        done
-        if [ "$nn_ready" = true ]; then
+      for retry in {1..60}; do
+        if curl -sf "${tmp_url}"; then
+          log "INFO" "NameNode服务 ${nn_service} 已就绪 (重试 ${retry}/60)"
+          nn_ready=true
           break
+        else
+          log "INFO" "NameNode服务 ${nn_service} 未就绪，继续等待 (重试 ${retry}/60)"
         fi
+        sleep 5
       done
 
       if [ "$nn_ready" = true ]; then
@@ -130,29 +122,24 @@ data:
       # 等待JournalNode就绪
       log "INFO" "等待JournalNode就绪..."
       jn_ready=false
-      JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
-      for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
-        jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
-        log "INFO" "检测JournalNode: ${jn_service}"
-        for retry in {1..60}; do
-          if nslookup "${jn_service}" >/dev/null 2>&1; then
-            log "INFO" "JournalNode ${jn_service} DNS解析成功"
-            # 尝试连接JournalNode端口
-            if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
-              log "INFO" "JournalNode ${jn_service} 端口连接成功"
-              jn_ready=true
-              break 2
-            else
-              log "INFO" "JournalNode ${jn_service} DNS解析成功但端口未就绪，继续等待"
-            fi
+      jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn"
+      log "INFO" "检测JournalNode服务: ${jn_service}"
+      
+      for retry in {1..60}; do
+        if nslookup "${jn_service}" >/dev/null 2>&1; then
+          log "INFO" "JournalNode服务 ${jn_service} DNS解析成功"
+          # 尝试连接JournalNode端口
+          if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
+            log "INFO" "JournalNode服务 ${jn_service} 端口连接成功"
+            jn_ready=true
+            break
           else
-            log "INFO" "JournalNode ${jn_service} DNS解析失败，继续等待"
+            log "INFO" "JournalNode服务 ${jn_service} DNS解析成功但端口未就绪，继续等待"
           fi
-          sleep 5
-        done
-        if [ "$jn_ready" = true ]; then
-          break
+        else
+          log "INFO" "JournalNode服务 ${jn_service} DNS解析失败，继续等待"
         fi
+        sleep 5
       done
 
       if [ "$jn_ready" = true ]; then
