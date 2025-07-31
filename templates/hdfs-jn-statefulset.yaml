@@ -63,7 +63,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: 8480
+              port: 8485
             initialDelaySeconds: 90
             periodSeconds: 15
             timeoutSeconds: 5
@@ -73,7 +73,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /
-              port: 8480
+              port: 8485
             initialDelaySeconds: 120
             periodSeconds: 20
             timeoutSeconds: 5

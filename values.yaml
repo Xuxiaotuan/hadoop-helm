@@ -8,7 +8,7 @@ hdfs:
   rpcAddress: "min-hadoop-hdfs-nn-0:9000"  # ➤ 关键：用于 core-site.xml fs.defaultFS 多NN模式
 
   nameNode:
-    replicas: 3  # 修改为3个namenode
+    replicas: 2  # 修改为2个namenode（Hadoop HA标准配置）
     resources:
       requests:
         memory: "512Mi"

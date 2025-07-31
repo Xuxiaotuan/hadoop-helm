@@ -64,7 +64,7 @@ data:
       for i in $(seq 0 $((REPLICA_COUNT - 1))); do
         nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
         tmp_url="http://${nn_service}:${NN_WEB_PORT}"
-        for retry in {1..24}; do
+        for retry in {1..60}; do
           if curl -sf "${tmp_url}"; then
             log "INFO" "NameNode ${nn_service} 已就绪"
             nn_ready=true
@@ -78,6 +78,7 @@ data:
       done
 
       if [ "$nn_ready" = true ]; then
+        log "INFO" "至少有一个NameNode就绪，启动DataNode"
         "${HADOOP_HOME}/bin/hdfs" datanode
       else
         log "ERROR" "所有NameNode都未就绪，退出"
@@ -88,6 +89,9 @@ data:
     if [[ "${HOSTNAME}" =~ "hdfs-jn" ]]; then
       log "INFO" "启动JournalNode"
       mkdir -p /data/hdfs/journalnode
+      
+      # 简化JournalNode启动逻辑，直接启动
+      log "INFO" "启动JournalNode服务"
       "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
@@ -106,12 +110,18 @@ data:
       jn_ready=false
       JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
       for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
-        jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-journalnode"
-        for retry in {1..30}; do
+        jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
+        for retry in {1..60}; do
           if nslookup "${jn_service}" >/dev/null 2>&1; then
-            log "INFO" "JournalNode ${jn_service} 已就绪"
-            jn_ready=true
-            break 2
+            log "INFO" "JournalNode ${jn_service} DNS解析成功"
+            # 尝试连接JournalNode端口
+            if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
+              log "INFO" "JournalNode ${jn_service} 端口连接成功"
+              jn_ready=true
+              break 2
+            else
+              log "INFO" "JournalNode ${jn_service} DNS解析成功但端口未就绪，继续等待"
+            fi
           fi
           sleep 5
         done
@@ -129,6 +139,7 @@ data:
           else
             log "INFO" "等待第一个NameNode格式化完成"
             timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
+            log "INFO" "启动第二个NameNode（Standby）"
           fi
         fi
 
@@ -225,7 +236,7 @@ data:
       {{- end }}
       <property>
         <name>dfs.namenode.shared.edits.dir</name>
-        <value>qjournal://{{- range $i, $e := until (.Values.hdfs.journalNode.replicas | int) }}{{ if $i }};{{ end }}{{ include "hadoop.fullname" $ }}-hdfs-jn-{{ $i }}.{{ include "hadoop.fullname" $ }}-journalnode:8485{{- end }}/{{ .Values.hdfs.clusterName }}</value>
+        <value>qjournal://{{- range $i, $e := until (.Values.hdfs.journalNode.replicas | int) }}{{ if $i }};{{ end }}{{ include "hadoop.fullname" $ }}-hdfs-jn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-jn:8485{{- end }}/{{ .Values.hdfs.clusterName }}</value>
       </property>
       <property>
         <name>dfs.ha.automatic-failover.enabled</name>
@@ -233,11 +244,15 @@ data:
       </property>
       <property>
         <name>dfs.ha.fencing.methods</name>
-        <value>sshfence</value>
+        <value>shell(/bin/true)</value>
       </property>
       <property>
-        <name>dfs.ha.fencing.ssh.private-key-files</name>
-        <value>/home/hadoop/.ssh/id_rsa</value>
+        <name>dfs.ha.namenode.id</name>
+        <value>nn${nn_index}</value>
+      </property>
+      <property>
+        <name>dfs.ha.initialization.timeout</name>
+        <value>300</value>
       </property>
     </configuration>
 
