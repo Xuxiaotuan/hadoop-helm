@@ -218,6 +218,10 @@ data:
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
             "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
+            if [ $? -ne 0 ]; then
+              log "ERROR" "NameNode格式化失败"
+              exit 1
+            fi
             touch /data/hdfs/namenode/formated
             log "INFO" "NameNode格式化完成"
           else
@@ -226,9 +230,13 @@ data:
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
             # 第二个NameNode直接使用bootstrapStandby命令同步元数据
-            # 不需要等待本地文件，bootstrapStandby会自动处理与活跃NameNode的同步
             log "INFO" "执行bootstrapStandby命令同步元数据..."
             "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby
+            if [ $? -ne 0 ]; then
+              log "ERROR" "bootstrapStandby失败，无法同步元数据"
+              exit 1
+            fi
+            touch /data/hdfs/namenode/formated
             log "INFO" "第二个NameNode元数据同步完成"
           fi
         else
