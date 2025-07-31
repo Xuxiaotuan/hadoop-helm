@@ -126,18 +126,13 @@ data:
       log "INFO" "检测JournalNode服务: ${jn_service}"
       
       for retry in {1..60}; do
-        if nslookup "${jn_service}" >/dev/null 2>&1; then
-          log "INFO" "JournalNode服务 ${jn_service} DNS解析成功"
-          # 尝试连接JournalNode端口
-          if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
-            log "INFO" "JournalNode服务 ${jn_service} 端口连接成功"
-            jn_ready=true
-            break
-          else
-            log "INFO" "JournalNode服务 ${jn_service} DNS解析成功但端口未就绪，继续等待"
-          fi
+        # 直接尝试连接，不依赖nslookup
+        if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
+          log "INFO" "JournalNode服务 ${jn_service} 端口连接成功 (重试 ${retry}/60)"
+          jn_ready=true
+          break
         else
-          log "INFO" "JournalNode服务 ${jn_service} DNS解析失败，继续等待"
+          log "INFO" "JournalNode服务 ${jn_service} 端口连接失败，继续等待 (重试 ${retry}/60)"
         fi
         sleep 5
       done
