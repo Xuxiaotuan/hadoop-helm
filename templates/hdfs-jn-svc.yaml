@@ -13,6 +13,9 @@ spec:
     - name: journal  # JN通信端口（8485为Hadoop 3.x+，2.x为8480）
       port: 8485
       targetPort: 8485  # 目标Pod端口（与容器内端口一致）
+    - name: http  # HTTP服务端口
+      port: 8480
+      targetPort: 8480  # 目标Pod端口（与容器内端口一致）
   selector:
     # 匹配JN的Pod标签，确保服务指向正确的Pod
     app.kubernetes.io/component: hdfs-jn
