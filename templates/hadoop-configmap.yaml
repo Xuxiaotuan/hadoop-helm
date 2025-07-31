@@ -89,7 +89,24 @@ data:
       done
 
       if [ "$nn_ready" = true ]; then
-        log "INFO" "NameNode就绪，启动DataNode服务"
+        log "INFO" "NameNode就绪，准备启动DataNode服务"
+        
+        # 检查是否需要强制格式化DataNode
+        FORCE_FORMAT_DN={{ .Values.formatting.forceFormatDataNode | default false }}
+        if [ "$FORCE_FORMAT_DN" = "true" ] || [ ! -f /data/hdfs/datanode/current/VERSION ]; then
+          log "INFO" "清理DataNode存储目录"
+          # 停止可能运行的 DataNode 进程
+          pkill -f datanode || true
+          sleep 2
+          # 清理旧数据
+          rm -rf /data/hdfs/datanode/current
+          rm -rf /data/hdfs/datanode/in_use.lock
+          log "INFO" "DataNode存储目录已清理，将重新注册到NameNode"
+        else
+          log "INFO" "DataNode已格式化，跳过清理步骤"
+        fi
+        
+        log "INFO" "启动DataNode服务"
         log "INFO" "DataNode将连接到NameNode进行注册"
         "${HADOOP_HOME}/bin/hdfs" datanode
       else
@@ -215,6 +232,11 @@ data:
 
         log "INFO" "启动NameNode服务"
         log "INFO" "NameNode将在端口9000提供RPC服务，9870提供HTTP服务"
+        
+        # 设置HA相关环境变量
+        export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
+        
+        # 启动NameNode
         "${HADOOP_HOME}/bin/hdfs" namenode
       else
         log "ERROR" "JournalNode未就绪，NameNode无法启动"
@@ -322,6 +344,22 @@ data:
       <property>
         <name>dfs.ha.fencing.methods</name>
         <value>shell(/bin/true)</value>
+      </property>
+      <property>
+        <name>dfs.ha.namenodes.{{ .Values.hdfs.clusterName }}</name>
+        <value>{{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}{{ if $i }},{{ end }}nn{{ $i }}{{- end }}</value>
+      </property>
+      <property>
+        <name>dfs.ha.namenode.id</name>
+        <value>nn${nn_index}</value>
+      </property>
+      <property>
+        <name>dfs.ha.initialization.timeout</name>
+        <value>300</value>
+      </property>
+      <property>
+        <name>dfs.ha.standby.checkpoints</name>
+        <value>true</value>
       </property>
       <property>
         <name>dfs.ha.namenode.id</name>
