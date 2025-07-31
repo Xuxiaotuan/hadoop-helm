@@ -54,21 +54,32 @@ data:
 
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
       log "INFO" "启动DataNode"
+      log "INFO" "DataNode配置：HTTP端口=${DN_HTTP_PORT}, 数据端口=${DN_DATA_PORT}"
+      
       mkdir -p /data/hdfs/datanode
+      log "INFO" "创建数据目录: /data/hdfs/datanode"
 
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      log "INFO" "更新配置文件端口配置"
 
+      log "INFO" "等待NameNode就绪..."
       nn_ready=false
       REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
+      log "INFO" "检测 ${REPLICA_COUNT} 个NameNode"
+      
       for i in $(seq 0 $((REPLICA_COUNT - 1))); do
         nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
         tmp_url="http://${nn_service}:${NN_WEB_PORT}"
+        log "INFO" "检测NameNode: ${nn_service}"
+        
         for retry in {1..60}; do
           if curl -sf "${tmp_url}"; then
-            log "INFO" "NameNode ${nn_service} 已就绪"
+            log "INFO" "NameNode ${nn_service} 已就绪 (重试 ${retry}/60)"
             nn_ready=true
             break 2
+          else
+            log "INFO" "NameNode ${nn_service} 未就绪，继续等待 (重试 ${retry}/60)"
           fi
           sleep 5
         done
@@ -78,39 +89,51 @@ data:
       done
 
       if [ "$nn_ready" = true ]; then
-        log "INFO" "至少有一个NameNode就绪，启动DataNode"
+        log "INFO" "NameNode就绪，启动DataNode服务"
+        log "INFO" "DataNode将连接到NameNode进行注册"
         "${HADOOP_HOME}/bin/hdfs" datanode
       else
-        log "ERROR" "所有NameNode都未就绪，退出"
+        log "ERROR" "所有NameNode都未就绪，DataNode无法启动"
+        log "ERROR" "请检查NameNode状态和网络连接"
         exit 1
       fi
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-jn" ]]; then
       log "INFO" "启动JournalNode"
+      log "INFO" "JournalNode用于存储NameNode的编辑日志，支持HA"
+      
       mkdir -p /data/hdfs/journalnode
+      log "INFO" "创建JournalNode数据目录: /data/hdfs/journalnode"
       
       # 简化JournalNode启动逻辑，直接启动
       log "INFO" "启动JournalNode服务"
+      log "INFO" "JournalNode将在端口8480提供HTTP服务，8485提供RPC服务"
       "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
       log "INFO" "启动NameNode"
+      log "INFO" "NameNode是HDFS的主节点，负责元数据管理"
+      
       mkdir -p /data/hdfs/namenode
+      log "INFO" "创建NameNode数据目录: /data/hdfs/namenode"
 
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
+      log "INFO" "更新DataNode端口配置"
 
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
       export HADOOP_NAMENODE_OPTS="${HADOOP_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
+      log "INFO" "设置NameNode ID: nn${nn_index}"
 
       # 等待JournalNode就绪
-      log "INFO" "等待JournalNode就绪"
+      log "INFO" "等待JournalNode就绪..."
       jn_ready=false
       JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
       for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
         jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
+        log "INFO" "检测JournalNode: ${jn_service}"
         for retry in {1..60}; do
           if nslookup "${jn_service}" >/dev/null 2>&1; then
             log "INFO" "JournalNode ${jn_service} DNS解析成功"
@@ -122,6 +145,8 @@ data:
             else
               log "INFO" "JournalNode ${jn_service} DNS解析成功但端口未就绪，继续等待"
             fi
+          else
+            log "INFO" "JournalNode ${jn_service} DNS解析失败，继续等待"
           fi
           sleep 5
         done
@@ -131,21 +156,30 @@ data:
       done
 
       if [ "$jn_ready" = true ]; then
+        log "INFO" "JournalNode就绪，开始启动NameNode"
+        
         if [ ! -f /data/hdfs/namenode/formated ]; then
           if [ "$nn_index" = "0" ]; then
-            log "INFO" "格式化第一个NameNode"
+            log "INFO" "格式化第一个NameNode (Active)"
+            log "INFO" "这将创建新的HDFS文件系统"
             "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
             touch /data/hdfs/namenode/formated
+            log "INFO" "NameNode格式化完成"
           else
-            log "INFO" "等待第一个NameNode格式化完成"
+            log "INFO" "等待第一个NameNode格式化完成..."
             timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
-            log "INFO" "启动第二个NameNode（Standby）"
+            log "INFO" "启动第二个NameNode（Standby模式）"
           fi
+        else
+          log "INFO" "NameNode已格式化，直接启动"
         fi
 
+        log "INFO" "启动NameNode服务"
+        log "INFO" "NameNode将在端口9000提供RPC服务，9870提供HTTP服务"
         "${HADOOP_HOME}/bin/hdfs" namenode
       else
-        log "ERROR" "JournalNode未就绪，退出"
+        log "ERROR" "JournalNode未就绪，NameNode无法启动"
+        log "ERROR" "请检查JournalNode状态和网络连接"
         exit 1
       fi
     fi
