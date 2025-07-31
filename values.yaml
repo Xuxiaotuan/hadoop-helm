@@ -5,7 +5,7 @@ antiAffinity: "soft"  # 最简单部署，不考虑强分布
 hdfs:
   clusterName: "min-hadoop"
 
-  rpcAddress: "min-hadoop-hdfs-nn-0:9000"  # ➤ 关键：用于 core-site.xml fs.defaultFS 多NN模式
+  rpcAddress: "min-hadoop"  # ➤ 关键：用于 core-site.xml fs.defaultFS HA模式
 
   nameNode:
     replicas: 2  # 修改为2个namenode（Hadoop HA标准配置）

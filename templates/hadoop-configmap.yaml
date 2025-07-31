@@ -131,12 +131,11 @@ data:
       sed -i "s/nn\${nn_index}/nn${nn_index}/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "已更新hdfs-site.xml中的namenode.id为: nn${nn_index}"
 
-      # 等待多数派JournalNode就绪
-      log "INFO" "等待多数派JournalNode就绪..."
+      # 等待所有JournalNode就绪
+      log "INFO" "等待所有JournalNode就绪..."
       jn_ready=false
       JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
-      min_jn_ready=$(( (JN_REPLICA_COUNT / 2) + 1 ))
-      log "INFO" "需要等待至少 ${min_jn_ready} 个JournalNode就绪（多数派）"
+      log "INFO" "需要等待所有 ${JN_REPLICA_COUNT} 个JournalNode就绪"
       
       for retry in {1..600}; do
         jn_ready_count=0
@@ -148,12 +147,12 @@ data:
           fi
         done
         
-        if [ "$jn_ready_count" -ge "$min_jn_ready" ]; then
-          log "INFO" "已有 ${jn_ready_count} 个JournalNode就绪（满足多数派要求）"
+        if [ "$jn_ready_count" -eq "$JN_REPLICA_COUNT" ]; then
+          log "INFO" "所有 ${JN_REPLICA_COUNT} 个JournalNode都已就绪"
           jn_ready=true
           break
         else
-          log "INFO" "当前有 ${jn_ready_count}/${JN_REPLICA_COUNT} 个JournalNode就绪，需要 ${min_jn_ready} 个（重试 ${retry}/600）"
+          log "INFO" "当前有 ${jn_ready_count}/${JN_REPLICA_COUNT} 个JournalNode就绪，继续等待（重试 ${retry}/600）"
         fi
         sleep 10
       done
