@@ -16,11 +16,34 @@ data:
     NN_WEB_PORT=9870
     DN_HTTP_PORT=9864
     DN_DATA_PORT=9866
+    JN_HTTP_PORT=8480
+    JN_RPC_PORT=8485
+    KUBECTL_TIMEOUT=10s
 
     log() {
       level=$1
       message=$2
       echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${level}] ${message}"
+    }
+
+    # 目录初始化（带权限检查）
+    init_dir() {
+      local dir=$1
+      mkdir -p "${dir}" || { log "ERROR" "创建目录失败: ${dir}"; exit 1; }
+      chmod 700 "${dir}" || { log "ERROR" "设置目录权限失败: ${dir}"; exit 1; }
+      touch "${dir}/.test" && rm -f "${dir}/.test" || { log "ERROR" "目录不可写: ${dir}"; exit 1; }
+    }
+
+    # 等待端口就绪
+    wait_for_port() {
+      local host=$1
+      local port=$2
+      local timeout=$3
+      log "INFO" "等待 $host:$port 就绪（超时 $timeout）"
+      if ! timeout "$timeout" bash -c "while ! nc -z $host $port; do sleep 2; done"; then
+        log "ERROR" "$host:$port 超时未就绪"
+        exit 1
+      fi
     }
 
     log "INFO" "启动Hadoop组件初始化，HADOOP_HOME=${HADOOP_HOME}"
@@ -55,127 +78,71 @@ data:
     if [[ "${HOSTNAME}" =~ "hdfs-dn" ]]; then
       log "INFO" "启动DataNode"
       log "INFO" "DataNode配置：HTTP端口=${DN_HTTP_PORT}, 数据端口=${DN_DATA_PORT}"
-      
-      mkdir -p /data/hdfs/datanode
-      log "INFO" "创建数据目录: /data/hdfs/datanode"
+      init_dir "/data/hdfs/datanode"
 
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "更新配置文件端口配置"
-      
+
       # 设置DataNode主机名
       dn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
       export HDFS_DATANODE_OPTS="${HDFS_DATANODE_OPTS:-} -Ddfs.datanode.hostname=${HOSTNAME}"
       log "INFO" "设置DataNode主机名为: ${HOSTNAME}"
 
-      log "INFO" "等待NameNode就绪..."
-      nn_ready=false
-      REPLICA_COUNT={{ .Values.hdfs.nameNode.replicas | int }}
-      log "INFO" "检测 ${REPLICA_COUNT} 个NameNode"
-      
-      for i in $(seq 0 $((REPLICA_COUNT - 1))); do
-        nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-${i}.{{ include "hadoop.fullname" . }}-hdfs-nn"
-        tmp_url="http://${nn_service}:${NN_WEB_PORT}"
-        log "INFO" "检测NameNode: ${nn_service}"
-        
-        for retry in {1..300}; do
-          if curl -sf "${tmp_url}"; then
-            log "INFO" "NameNode ${nn_service} 已就绪 (重试 ${retry}/300)"
-            nn_ready=true
-            break 2
-          else
-            log "INFO" "NameNode ${nn_service} 未就绪，继续等待 (重试 ${retry}/300)"
-          fi
-          sleep 10
-        done
-        if [ "$nn_ready" = true ]; then
-          break
-        fi
-      done
+      # 等待NameNode就绪
+      nn_service="{{ include "hadoop.fullname" . }}-hdfs-nn-active"
+      wait_for_port "$nn_service" "$NN_WEB_PORT" "5m"
 
-      if [ "$nn_ready" = true ]; then
-        log "INFO" "NameNode就绪，准备启动DataNode服务"
-        
-        # 检查是否需要强制格式化DataNode
-        FORCE_FORMAT_DN={{ .Values.formatting.forceFormatDataNode | default false }}
-        if [ "$FORCE_FORMAT_DN" = "true" ] || [ ! -f /data/hdfs/datanode/current/VERSION ]; then
-          log "INFO" "清理DataNode存储目录"
-          # 停止可能运行的 DataNode 进程
-          pkill -f datanode || true
-          sleep 2
-          # 清理旧数据
-          rm -rf /data/hdfs/datanode/current
-          rm -rf /data/hdfs/datanode/in_use.lock
-          log "INFO" "DataNode存储目录已清理，将重新注册到NameNode"
-        else
-          log "INFO" "DataNode已格式化，跳过清理步骤"
-        fi
-        
-        log "INFO" "启动DataNode服务"
-        log "INFO" "DataNode将连接到NameNode进行注册"
-        "${HADOOP_HOME}/bin/hdfs" datanode
+      # 检查是否需要强制格式化DataNode
+      FORCE_FORMAT_DN={{ .Values.formatting.forceFormatDataNode | default false }}
+      if [ "$FORCE_FORMAT_DN" = "true" ] || [ ! -f /data/hdfs/datanode/current/VERSION ]; then
+        log "INFO" "清理DataNode存储目录"
+        pkill -f datanode || true
+        sleep 2
+        rm -rf /data/hdfs/datanode/current
+        rm -rf /data/hdfs/datanode/in_use.lock
+        log "INFO" "DataNode存储目录已清理，将重新注册到NameNode"
       else
-        log "ERROR" "所有NameNode都未就绪，DataNode无法启动"
-        log "ERROR" "请检查NameNode状态和网络连接"
-        exit 1
+        log "INFO" "DataNode已格式化，跳过清理步骤"
       fi
+
+      log "INFO" "启动DataNode服务"
+      log "INFO" "DataNode将连接到NameNode进行注册"
+      "${HADOOP_HOME}/bin/hdfs" datanode
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-jn" ]]; then
       log "INFO" "启动JournalNode"
       log "INFO" "JournalNode用于存储NameNode的编辑日志，支持HA"
-      
-      mkdir -p /data/hdfs/journalnode
-      log "INFO" "创建JournalNode数据目录: /data/hdfs/journalnode"
-      
-      # 检查是否需要强制格式化
+      init_dir "/data/hdfs/journalnode"
       FORCE_FORMAT_JN={{ .Values.formatting.forceFormatJournalNode | default false }}
       if [ "$FORCE_FORMAT_JN" = "true" ] || [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
         log "INFO" "格式化JournalNode存储目录"
-        # 停止可能运行的 JournalNode 进程
         pkill -f journalnode || true
         sleep 2
-        # 清理旧数据
         rm -rf /data/hdfs/journalnode/min-hadoop
-        # 确保目录存在
         mkdir -p /data/hdfs/journalnode/min-hadoop
-        # 格式化JournalNode
         "${HADOOP_HOME}/bin/hdfs" journalnode -format
         log "INFO" "JournalNode格式化完成"
       else
         log "INFO" "JournalNode已格式化，跳过格式化步骤"
       fi
-      
       log "INFO" "启动JournalNode服务"
       log "INFO" "JournalNode将在端口8480提供HTTP服务，8485提供RPC服务"
-      
-      # 验证格式化是否成功
-      if [ -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
-        log "INFO" "JournalNode格式化验证成功，启动服务"
-        "${HADOOP_HOME}/bin/hdfs" journalnode
-      else
-        log "ERROR" "JournalNode格式化失败，无法启动服务"
-        exit 1
-      fi
+      "${HADOOP_HOME}/bin/hdfs" journalnode
     fi
 
     if [[ "${HOSTNAME}" =~ "hdfs-nn" ]]; then
       log "INFO" "启动NameNode"
       log "INFO" "NameNode是HDFS的主节点，负责元数据管理"
-      
-      mkdir -p /data/hdfs/namenode
-      log "INFO" "创建NameNode数据目录: /data/hdfs/namenode"
-
+      init_dir "/data/hdfs/namenode"
       sed -i "s/EXTERNAL_HTTP_PORT_REPLACEME/${DN_HTTP_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       sed -i "s/EXTERNAL_DATA_PORT_REPLACEME/${DN_DATA_PORT}/" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "更新DataNode端口配置"
-
       nn_index=$(echo "${HOSTNAME}" | grep -o '[0-9]\+$')
       export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index} -Ddfs.namenode.rpc-bind-host=0.0.0.0 -Ddfs.namenode.http-bind-host=0.0.0.0"
       log "INFO" "设置NameNode ID: nn${nn_index}"
       log "INFO" "设置NameNode绑定地址: 0.0.0.0"
-      
-      # 动态更新hdfs-site.xml中的namenode.id配置
       sed -i "s/<value>nn\${nn_index}<\/value>/<value>nn${nn_index}<\/value>/g" "${HADOOP_HOME}/etc/hadoop/hdfs-site.xml"
       log "INFO" "已更新hdfs-site.xml中的namenode.id为: nn${nn_index}"
 
@@ -184,123 +151,120 @@ data:
       jn_ready=false
       JN_REPLICA_COUNT={{ .Values.hdfs.journalNode.replicas | int }}
       log "INFO" "需要等待所有 ${JN_REPLICA_COUNT} 个JournalNode就绪"
-      
-      for retry in {1..600}; do
-        jn_ready_count=0
-        for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
-          jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
-          if timeout 5 bash -c "</dev/tcp/${jn_service}/8485" 2>/dev/null; then
-            log "INFO" "JournalNode ${jn_service} 已就绪"
-            jn_ready_count=$((jn_ready_count + 1))
-          fi
-        done
-        
-        if [ "$jn_ready_count" -eq "$JN_REPLICA_COUNT" ]; then
-          log "INFO" "所有 ${JN_REPLICA_COUNT} 个JournalNode都已就绪"
-          jn_ready=true
-          break
-        else
-          log "INFO" "当前有 ${jn_ready_count}/${JN_REPLICA_COUNT} 个JournalNode就绪，继续等待（重试 ${retry}/600）"
-        fi
-        sleep 10
+      for i in $(seq 0 $((JN_REPLICA_COUNT - 1))); do
+        jn_service="{{ include "hadoop.fullname" . }}-hdfs-jn-${i}.{{ include "hadoop.fullname" . }}-hdfs-jn"
+        wait_for_port "$jn_service" "$JN_RPC_PORT" "5m"
       done
 
-      if [ "$jn_ready" = true ]; then
-        log "INFO" "JournalNode就绪，开始启动NameNode"
-        
-        # 检查是否需要强制格式化
-        FORCE_FORMAT_NN={{ .Values.formatting.forceFormatNameNode | default false }}
-        if [ "$FORCE_FORMAT_NN" = "true" ] || [ ! -f /data/hdfs/namenode/formated ]; then
+      # NameNode格式化加锁机制
+      lock_file="/data/hdfs/namenode/.format.lock"
+      if [ ! -f "/data/hdfs/namenode/formated" ]; then
+        if mkdir "${lock_file}" 2>/dev/null; then
           if [ "$nn_index" = "0" ]; then
             log "INFO" "格式化第一个NameNode (Active)"
             log "INFO" "这将创建新的HDFS文件系统"
-            # 清理旧数据
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
             "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
             if [ $? -ne 0 ]; then
               log "ERROR" "NameNode格式化失败"
+              rm -rf "${lock_file}"
               exit 1
             fi
             touch /data/hdfs/namenode/formated
             log "INFO" "NameNode格式化完成"
           else
             log "INFO" "启动第二个NameNode（Standby模式）"
-            # 清理旧数据
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
-            # 第二个NameNode直接使用bootstrapStandby命令同步元数据
             log "INFO" "执行bootstrapStandby命令同步元数据..."
             "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby
             if [ $? -ne 0 ]; then
               log "ERROR" "bootstrapStandby失败，无法同步元数据"
+              rm -rf "${lock_file}"
               exit 1
             fi
             touch /data/hdfs/namenode/formated
             log "INFO" "第二个NameNode元数据同步完成"
           fi
+          rm -rf "${lock_file}"
         else
-          log "INFO" "NameNode已格式化，跳过格式化步骤"
+          log "INFO" "等待其他节点完成格式化..."
+          while [ ! -f "/data/hdfs/namenode/formated" ]; do
+            sleep 5
+          done
         fi
+      fi
 
-        log "INFO" "启动NameNode服务"
-        log "INFO" "NameNode将在端口9000提供RPC服务，9870提供HTTP服务"
-        
-        # 设置HA相关环境变量
-        export HDFS_NAMENODE_OPTS="${HDFS_NAMENODE_OPTS:-} -Ddfs.ha.namenode.id=nn${nn_index}"
-        
-        # 启动NameNode
-        "${HADOOP_HOME}/bin/hdfs" namenode &
-        namenode_pid=$!
-        
-        # 等待NameNode启动
-        log "INFO" "等待NameNode启动..."
-        for retry in {1..60}; do
-          if curl -sf "http://localhost:9870" >/dev/null 2>&1; then
-            log "INFO" "NameNode已启动，等待30秒确保完全就绪..."
-            sleep 30
+      # 启动NameNode服务
+      log "INFO" "启动NameNode服务"
+      log "INFO" "NameNode将在端口9000提供RPC服务，9870提供HTTP服务"
+      "${HADOOP_HOME}/bin/hdfs" namenode &
+      namenode_pid=$!
+      log "INFO" "等待NameNode启动..."
+      for retry in {1..60}; do
+        if curl -sf "http://localhost:9870" >/dev/null 2>&1; then
+          log "INFO" "NameNode已启动，等待30秒确保完全就绪..."
+          sleep 30
+          break
+        else
+          log "INFO" "NameNode未就绪，继续等待 (重试 ${retry}/60)"
+          sleep 5
+        fi
+      done
+
+      # 自动标签切换（仅在容器内有kubectl时启用）
+      if command -v kubectl &>/dev/null; then
+        monitor_nn_state() {
+          local LABEL_KEY="hdfs.nn.state"
+          local ACTIVE="active"
+          local NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || echo "default")
+          local POD_NAME="${HOSTNAME}"
+          local NN_ID="nn${nn_index}"
+          log "INFO" "启动自动标签监控 (NN_ID=${NN_ID})"
+          while sleep 5; do
+            local STATE=$("${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState "${NN_ID}" 2>/dev/null)
+            if [ -z "${STATE}" ]; then
+              continue
+            fi
+            if [ "${STATE}" = "${ACTIVE}" ]; then
+              if ! kubectl get pod "${POD_NAME}" -n "${NAMESPACE}" -l "${LABEL_KEY}=${ACTIVE}" --no-headers &>/dev/null; then
+                kubectl patch pod "${POD_NAME}" -n "${NAMESPACE}" -p '{"metadata":{"labels":{"'${LABEL_KEY}'":"'${ACTIVE}'"}}}' --timeout="${KUBECTL_TIMEOUT}" &>/dev/null
+                log "INFO" "已自动打标签: ${LABEL_KEY}=${ACTIVE}"
+              fi
+            else
+              # standby时移除active标签
+              if kubectl get pod "${POD_NAME}" -n "${NAMESPACE}" -l "${LABEL_KEY}=${ACTIVE}" --no-headers &>/dev/null; then
+                kubectl patch pod "${POD_NAME}" -n "${NAMESPACE}" --type=json -p '[{"op":"remove","path":"/metadata/labels/'${LABEL_KEY}'"}]' --timeout="${KUBECTL_TIMEOUT}" &>/dev/null
+                log "INFO" "已自动移除标签: ${LABEL_KEY}"
+              fi
+            fi
+          done
+        }
+        monitor_nn_state &
+      else
+        log "WARN" "未找到kubectl，跳过自动标签切换"
+      fi
+
+      if [ "$nn_index" = "0" ]; then
+        log "INFO" "设置nn0为Active NameNode"
+        sleep 10
+        for retry in {1..30}; do
+          if "${HADOOP_HOME}/bin/hdfs" haadmin -transitionToActive nn0 -forceactive 2>/dev/null; then
+            log "INFO" "成功设置nn0为Active NameNode"
             break
           else
-            log "INFO" "NameNode未就绪，继续等待 (重试 ${retry}/60)"
+            log "INFO" "设置Active失败，重试 (${retry}/30)"
             sleep 5
           fi
         done
-        
-        # 如果是第一个NameNode (nn0)，设置为Active
-        if [ "$nn_index" = "0" ]; then
-          log "INFO" "设置nn0为Active NameNode"
-          # 等待一段时间确保NameNode完全启动
-          sleep 10
-          
-          # 尝试设置Active状态
-          for retry in {1..30}; do
-            if "${HADOOP_HOME}/bin/hdfs" haadmin -transitionToActive nn0 -forceactive 2>/dev/null; then
-              log "INFO" "成功设置nn0为Active NameNode"
-              break
-            else
-              log "INFO" "设置Active失败，重试 (${retry}/30)"
-              sleep 5
-            fi
-          done
-          
-          # 验证状态
-          if "${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState nn0 2>/dev/null | grep -q "active"; then
-            log "INFO" "nn0 Active状态确认成功"
-            # 更新Pod标签为active
-            kubectl label pod "${HOSTNAME}" hdfs.nn.state=active --overwrite
-            log "INFO" "已更新Pod标签为active"
-          else
-            log "WARN" "nn0 Active状态确认失败，但继续运行"
-          fi
+        if "${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState nn0 2>/dev/null | grep -q "active"; then
+          log "INFO" "nn0 Active状态确认成功"
+        else
+          log "WARN" "nn0 Active状态确认失败，但继续运行"
         fi
-        
-        # 等待NameNode进程
-        wait $namenode_pid
-      else
-        log "ERROR" "JournalNode未就绪，NameNode无法启动"
-        log "ERROR" "请检查JournalNode状态和网络连接"
-        exit 1
       fi
+      wait $namenode_pid
     fi
 
     if [[ "${1:-}" == "-bash" ]]; then

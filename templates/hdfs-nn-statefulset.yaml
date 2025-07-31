@@ -79,10 +79,18 @@ spec:
               mountPath: /tmp/hadoop-config
             - name: dfs
               mountPath: /data/hdfs/namenode
+            - name: kubectl-bin
+              mountPath: /usr/bin/kubectl
+              subPath: kubectl
+              readOnly: true
       volumes:
         - name: hadoop-config
           configMap:
             name: {{ include "hadoop.fullname" . }}
+        - name: kubectl-bin
+          hostPath:
+            path: /usr/bin/kubectl
+            type: File
 
         {{- if not .Values.persistence.nameNode.enabled }}
         # ➤ 未启用持久化时使用 emptyDir
