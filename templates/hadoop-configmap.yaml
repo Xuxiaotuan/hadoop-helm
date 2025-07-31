@@ -203,11 +203,9 @@ data:
             # 清理旧数据
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
-            # 等待第一个NameNode格式化完成
-            log "INFO" "等待第一个NameNode格式化完成..."
-            timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
-            log "INFO" "第一个NameNode已格式化，准备启动第二个NameNode"
-            # 第二个NameNode使用bootstrapStandby命令同步元数据
+            # 第二个NameNode直接使用bootstrapStandby命令同步元数据
+            # 不需要等待本地文件，bootstrapStandby会自动处理与活跃NameNode的同步
+            log "INFO" "执行bootstrapStandby命令同步元数据..."
             "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby
             log "INFO" "第二个NameNode元数据同步完成"
           fi
