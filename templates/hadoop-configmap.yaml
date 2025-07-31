@@ -203,6 +203,13 @@ data:
             # 清理旧数据
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
+            # 等待第一个NameNode格式化完成
+            log "INFO" "等待第一个NameNode格式化完成..."
+            timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
+            log "INFO" "第一个NameNode已格式化，准备启动第二个NameNode"
+            # 第二个NameNode使用bootstrapStandby命令同步元数据
+            "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby
+            log "INFO" "第二个NameNode元数据同步完成"
           fi
         else
           log "INFO" "NameNode已格式化，跳过格式化步骤"
@@ -240,11 +247,11 @@ data:
       {{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}
       <property>
         <name>dfs.namenode.rpc-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
-        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9000</value>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn.{{ $.Release.Namespace }}.svc.cluster.local:9000</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
-        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9870</value>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn.{{ $.Release.Namespace }}.svc.cluster.local:9870</value>
       </property>
       {{- end }}
       <property>
@@ -299,16 +306,16 @@ data:
       {{- range $i, $e := until (.Values.hdfs.nameNode.replicas | int) }}
       <property>
         <name>dfs.namenode.rpc-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
-        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9000</value>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn.{{ $.Release.Namespace }}.svc.cluster.local:9000</value>
       </property>
       <property>
         <name>dfs.namenode.http-address.{{ $.Values.hdfs.clusterName }}.nn{{ $i }}</name>
-        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn:9870</value>
+        <value>{{ include "hadoop.fullname" $ }}-hdfs-nn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-nn.{{ $.Release.Namespace }}.svc.cluster.local:9870</value>
       </property>
       {{- end }}
       <property>
         <name>dfs.namenode.shared.edits.dir</name>
-        <value>qjournal://{{- range $i, $e := until (.Values.hdfs.journalNode.replicas | int) }}{{ if $i }};{{ end }}{{ include "hadoop.fullname" $ }}-hdfs-jn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-jn:8485{{- end }}/{{ .Values.hdfs.clusterName }}</value>
+        <value>qjournal://{{- range $i, $e := until (.Values.hdfs.journalNode.replicas | int) }}{{ if $i }};{{ end }}{{ include "hadoop.fullname" $ }}-hdfs-jn-{{ $i }}.{{ include "hadoop.fullname" $ }}-hdfs-jn.{{ $.Release.Namespace }}.svc.cluster.local:8485{{- end }}/{{ .Values.hdfs.clusterName }}</value>
       </property>
       <property>
         <name>dfs.ha.automatic-failover.enabled</name>
