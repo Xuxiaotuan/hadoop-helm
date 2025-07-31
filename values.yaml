@@ -2,6 +2,11 @@ logLevel: INFO
 
 antiAffinity: "soft"  # 最简单部署，不考虑强分布
 
+# 格式化控制参数
+formatting:
+  forceFormatJournalNode: true  # 是否强制重新格式化 JournalNode
+  forceFormatNameNode: true     # 是否强制重新格式化 NameNode
+
 hdfs:
   clusterName: "min-hadoop"
 

@@ -106,16 +106,22 @@ data:
       mkdir -p /data/hdfs/journalnode
       log "INFO" "创建JournalNode数据目录: /data/hdfs/journalnode"
       
-      # 检查JournalNode是否已格式化
-      if [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
+      # 检查是否需要强制格式化
+      FORCE_FORMAT_JN={{ .Values.formatting.forceFormatJournalNode | default false }}
+      if [ "$FORCE_FORMAT_JN" = "true" ] || [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
         log "INFO" "格式化JournalNode存储目录"
+        # 停止可能运行的 JournalNode 进程
+        pkill -f journalnode || true
+        sleep 2
+        # 清理旧数据
+        rm -rf /data/hdfs/journalnode/min-hadoop
         # 确保目录存在
         mkdir -p /data/hdfs/journalnode/min-hadoop
         # 格式化JournalNode
         "${HADOOP_HOME}/bin/hdfs" journalnode -format
         log "INFO" "JournalNode格式化完成"
       else
-        log "INFO" "JournalNode已格式化，直接启动"
+        log "INFO" "JournalNode已格式化，跳过格式化步骤"
       fi
       
       log "INFO" "启动JournalNode服务"
@@ -180,20 +186,26 @@ data:
       if [ "$jn_ready" = true ]; then
         log "INFO" "JournalNode就绪，开始启动NameNode"
         
-        if [ ! -f /data/hdfs/namenode/formated ]; then
+        # 检查是否需要强制格式化
+        FORCE_FORMAT_NN={{ .Values.formatting.forceFormatNameNode | default false }}
+        if [ "$FORCE_FORMAT_NN" = "true" ] || [ ! -f /data/hdfs/namenode/formated ]; then
           if [ "$nn_index" = "0" ]; then
             log "INFO" "格式化第一个NameNode (Active)"
             log "INFO" "这将创建新的HDFS文件系统"
+            # 清理旧数据
+            rm -rf /data/hdfs/namenode/current
+            rm -rf /data/hdfs/namenode/formated
             "${HADOOP_HOME}/bin/hdfs" namenode -format -force -nonInteractive
             touch /data/hdfs/namenode/formated
             log "INFO" "NameNode格式化完成"
           else
-            log "INFO" "等待第一个NameNode格式化完成..."
-            timeout 10m bash -c "until [ -f /data/hdfs/namenode/formated ]; do sleep 10; done"
             log "INFO" "启动第二个NameNode（Standby模式）"
+            # 清理旧数据
+            rm -rf /data/hdfs/namenode/current
+            rm -rf /data/hdfs/namenode/formated
           fi
         else
-          log "INFO" "NameNode已格式化，直接启动"
+          log "INFO" "NameNode已格式化，跳过格式化步骤"
         fi
 
         log "INFO" "启动NameNode服务"
