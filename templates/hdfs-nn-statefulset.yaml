@@ -27,6 +27,8 @@ spec:
         app.kubernetes.io/component: hdfs-nn
     spec:
       serviceAccountName: {{ include "hadoop.fullname" . }}-hdfs-nn
+      nodeSelector:
+        kubernetes.io/hostname: xjw
       affinity:
         podAntiAffinity:
         {{- if eq .Values.antiAffinity "hard" }}
