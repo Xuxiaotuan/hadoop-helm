@@ -122,7 +122,12 @@ data:
         sleep 2
         rm -rf /data/hdfs/journalnode/min-hadoop
         mkdir -p /data/hdfs/journalnode/min-hadoop
-        "${HADOOP_HOME}/bin/hdfs" journalnode -format
+        log "INFO" "执行JournalNode格式化命令..."
+        "${HADOOP_HOME}/bin/hdfs" journalnode -format -force -nonInteractive
+        if [ $? -ne 0 ]; then
+          log "ERROR" "JournalNode格式化失败"
+          exit 1
+        fi
         log "INFO" "JournalNode格式化完成"
       else
         log "INFO" "JournalNode已格式化，跳过格式化步骤"
@@ -225,6 +230,7 @@ data:
           local NN_ID="nn${nn_index}"
           log "INFO" "启动自动标签监控 (NN_ID=${NN_ID}, NAMESPACE=${NAMESPACE}, POD_NAME=${POD_NAME})"
           log "INFO" "检查kubectl权限: $(kubectl auth can-i get pods -n ${NAMESPACE} 2>/dev/null || echo 'permission denied')"
+          log "INFO" "检查kubectl配置: $(kubectl config view --minify 2>/dev/null | grep -E '(server|namespace)' || echo 'no config')"
           while sleep 5; do
             local STATE=$("${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState "${NN_ID}" 2>/dev/null)
             if [ -z "${STATE}" ]; then

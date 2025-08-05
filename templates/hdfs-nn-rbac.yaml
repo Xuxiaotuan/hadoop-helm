@@ -19,7 +19,7 @@ metadata:
 rules:
   - apiGroups: [""]  # 核心API组
     resources: ["pods"]  # 资源类型为Pod
-    verbs: ["get", "patch"]  # 允许的操作：获取Pod信息、修改Pod标签
+    verbs: ["get", "patch", "list"]  # 允许的操作：获取Pod信息、修改Pod标签、列出Pod
     resourceNames:  # 仅允许操作指定的NN Pod（2个副本）
       - "{{ include "hadoop.fullname" . }}-hdfs-nn-0"
       - "{{ include "hadoop.fullname" . }}-hdfs-nn-1"
