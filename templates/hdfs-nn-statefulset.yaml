@@ -101,7 +101,7 @@ spec:
             type: File
         - name: kubeconfig
           hostPath:
-            path: ~/.kube/config
+            path: /home/xjw/.kube/config
             type: File
 
         {{- if not .Values.persistence.nameNode.enabled }}
