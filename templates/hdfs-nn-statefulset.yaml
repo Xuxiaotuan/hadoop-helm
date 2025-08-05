@@ -89,7 +89,6 @@ spec:
               readOnly: true
             - name: kubeconfig
               mountPath: /root/.kube/config
-              subPath: config
               readOnly: true
       volumes:
         - name: hadoop-config
