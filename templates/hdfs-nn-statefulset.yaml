@@ -81,7 +81,6 @@ spec:
               mountPath: /data/hdfs/namenode
             - name: kubectl-bin
               mountPath: /usr/bin/kubectl
-              subPath: kubectl
               readOnly: true
       volumes:
         - name: hadoop-config
