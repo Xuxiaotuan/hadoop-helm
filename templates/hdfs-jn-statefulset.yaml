@@ -53,11 +53,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
 
-          # 启动命令：调用 bootstrap.sh 并传参 -j（JournalNode）
+          # 启动命令：调用 bootstrap.sh
           command:
             - "/bin/bash"
             - "/tmp/hadoop-config/bootstrap.sh"
-            - "-j"
 
           # 就绪探针（Ready）
           readinessProbe:
