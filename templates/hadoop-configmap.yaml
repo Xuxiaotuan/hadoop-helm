@@ -178,7 +178,7 @@ data:
             rm -rf /data/hdfs/namenode/current
             rm -rf /data/hdfs/namenode/formated
             log "INFO" "执行bootstrapStandby命令同步元数据..."
-            "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby
+            "${HADOOP_HOME}/bin/hdfs" namenode -bootstrapStandby -force -nonInteractive
             if [ $? -ne 0 ]; then
               log "ERROR" "bootstrapStandby失败，无法同步元数据"
               rm -rf "${lock_file}"
@@ -214,14 +214,17 @@ data:
       done
 
       # 自动标签切换（仅在容器内有kubectl时启用）
+      log "INFO" "检查kubectl可用性..."
       if command -v kubectl &>/dev/null; then
+        log "INFO" "kubectl命令可用，版本: $(kubectl version --client --short 2>/dev/null || echo 'unknown')"
         monitor_nn_state() {
           local LABEL_KEY="hdfs.nn.state"
           local ACTIVE="active"
           local NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || echo "default")
           local POD_NAME="${HOSTNAME}"
           local NN_ID="nn${nn_index}"
-          log "INFO" "启动自动标签监控 (NN_ID=${NN_ID})"
+          log "INFO" "启动自动标签监控 (NN_ID=${NN_ID}, NAMESPACE=${NAMESPACE}, POD_NAME=${POD_NAME})"
+          log "INFO" "检查kubectl权限: $(kubectl auth can-i get pods -n ${NAMESPACE} 2>/dev/null || echo 'permission denied')"
           while sleep 5; do
             local STATE=$("${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState "${NN_ID}" 2>/dev/null)
             if [ -z "${STATE}" ]; then
@@ -243,7 +246,7 @@ data:
         }
         monitor_nn_state &
       else
-        log "WARN" "未找到kubectl，跳过自动标签切换"
+        log "INFO" "未找到kubectl，跳过自动标签切换（这是正常情况）"
       fi
 
       if [ "$nn_index" = "0" ]; then
