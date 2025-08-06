@@ -231,12 +231,25 @@ create_local_pvs() {
     local node_array=($nodes)
     local node_count=${#node_array[@]}
     
-    if [ $node_count -lt 2 ]; then
-        log_error "需要至少2个节点来部署Hadoop集群"
-        exit 1
+    if [ $node_count -lt 3 ]; then  # 修改：要求至少3节点 for HA
+      log_warn "HA 部署推荐至少3个节点（当前: $node_count），继续但可能不稳定"
     fi
     
     log_info "检测到节点: ${node_array[*]}"
+    
+    # 新增：从 values.yaml 读取 PV 大小（使用 yq 或 grep 解析）
+    local nn_size=$(grep 'nameNode:.*size:' values.yaml | awk '{print $2}' | tr -d '"' || echo "10Gi")
+    local dn_size=$(grep 'dataNode:.*size:' values.yaml | awk '{print $2}' | tr -d '"' || echo "20Gi")
+    local jn_size=$(grep 'journalNode:.*size:' values.yaml | awk '{print $2}' | tr -d '"' || echo "5Gi")
+    log_info "使用 PV 大小: NN=${nn_size}, DN=${dn_size}, JN=${jn_size}"
+    
+    # 新增：SSH 预检查
+    for node in "${node_array[@]}"; do
+      if ! ssh $node "echo 'SSH test'" &>/dev/null; then
+        log_error "无法 SSH 到节点 $node，请检查权限或配置"
+        exit 1
+      fi
+    done
     
     # 创建PV配置文件，使用命名空间前缀避免冲突
     cat > /tmp/local-pvs-${namespace}.yaml << EOF
@@ -251,7 +264,7 @@ metadata:
     pvIndex: "0"
 spec:
   capacity:
-    storage: 10Gi
+    storage: ${nn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -279,7 +292,7 @@ metadata:
     pvIndex: "1"
 spec:
   capacity:
-    storage: 10Gi
+    storage: ${nn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -307,7 +320,7 @@ metadata:
     pvIndex: "2"
 spec:
   capacity:
-    storage: 10Gi
+    storage: ${nn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -335,7 +348,7 @@ metadata:
     pvIndex: "0"
 spec:
   capacity:
-    storage: 20Gi
+    storage: ${dn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -363,7 +376,7 @@ metadata:
     pvIndex: "1"
 spec:
   capacity:
-    storage: 20Gi
+    storage: ${dn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -391,7 +404,7 @@ metadata:
     pvIndex: "2"
 spec:
   capacity:
-    storage: 20Gi
+    storage: ${dn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -419,7 +432,7 @@ metadata:
     pvIndex: "0"
 spec:
   capacity:
-    storage: 5Gi
+    storage: ${jn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -447,7 +460,7 @@ metadata:
     pvIndex: "1"
 spec:
   capacity:
-    storage: 5Gi
+    storage: ${jn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -475,7 +488,7 @@ metadata:
     pvIndex: "2"
 spec:
   capacity:
-    storage: 5Gi
+    storage: ${jn_size}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
@@ -492,16 +505,18 @@ spec:
           - ${node_array[0]}
 EOF
 
-    # 在节点上创建目录
+    # 在节点上创建目录（动态分配）
     log_info "在节点上创建存储目录..."
-    for node in "${node_array[@]}"; do
-        if [ "$node" = "${node_array[0]}" ]; then
-            # 第一个节点
-            ssh $node "sudo mkdir -p /mnt/data/${namespace}/hadoop-nn-0 /mnt/data/${namespace}/hadoop-nn-2 /mnt/data/${namespace}/hadoop-dn-0 /mnt/data/${namespace}/hadoop-dn-2 /mnt/data/${namespace}/hadoop-jn-0 /mnt/data/${namespace}/hadoop-jn-2 && sudo chmod 777 /mnt/data/${namespace}/hadoop-*" 2>/dev/null || log_warn "无法在节点 $node 上创建目录，请手动创建"
-        else
-            # 第二个节点
-            ssh $node "sudo mkdir -p /mnt/data/${namespace}/hadoop-nn-1 /mnt/data/${namespace}/hadoop-dn-1 /mnt/data/${namespace}/hadoop-jn-1 && sudo chmod 777 /mnt/data/${namespace}/hadoop-*" 2>/dev/null || log_warn "无法在节点 $node 上创建目录，请手动创建"
-        fi
+    local components=("nn" "dn" "jn")
+    local replicas=(2 3 3)  # NN:2, DN:3, JN:3
+    for i in {0..2}; do  # 对于每个组件
+      comp=${components[$i]}
+      rep=${replicas[$i]}
+      for j in $(seq 0 $((rep - 1))); do
+        node_index=$((j % node_count))  # 模运算均衡分配
+        node=${node_array[$node_index]}
+        ssh $node "sudo mkdir -p /mnt/data/${namespace}/hadoop-${comp}-${j} && sudo chmod 777 /mnt/data/${namespace}/hadoop-${comp}-${j}" 2>/dev/null || log_warn "无法在节点 $node 上创建目录，请手动创建"
+      done
     done
     
     # 应用PV配置
