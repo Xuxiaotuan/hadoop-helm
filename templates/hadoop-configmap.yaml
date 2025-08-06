@@ -115,27 +115,6 @@ data:
       log "INFO" "启动JournalNode"
       log "INFO" "JournalNode用于存储NameNode的编辑日志，支持HA"
       init_dir "/data/hdfs/journalnode"
-      FORCE_FORMAT_JN={{ .Values.formatting.forceFormatJournalNode | default false }}
-      log "INFO" "JournalNode格式化配置: FORCE_FORMAT_JN=${FORCE_FORMAT_JN}"
-      log "INFO" "检查JournalNode目录: $(ls -la /data/hdfs/journalnode/ 2>/dev/null || echo 'directory not found')"
-      if [ "$FORCE_FORMAT_JN" = "true" ] || [ ! -f /data/hdfs/journalnode/min-hadoop/current/VERSION ]; then
-        log "INFO" "格式化JournalNode存储目录"
-        pkill -f journalnode || true
-        sleep 2
-        rm -rf /data/hdfs/journalnode/min-hadoop
-        mkdir -p /data/hdfs/journalnode/min-hadoop
-        log "INFO" "执行JournalNode格式化命令..."
-        "${HADOOP_HOME}/bin/hdfs" journalnode -format -force -nonInteractive
-        if [ $? -ne 0 ]; then
-          log "ERROR" "JournalNode格式化失败"
-          exit 1
-        fi
-        log "INFO" "JournalNode格式化完成"
-        log "INFO" "格式化后目录内容: $(ls -la /data/hdfs/journalnode/min-hadoop/ 2>/dev/null || echo 'directory empty')"
-      else
-        log "INFO" "JournalNode已格式化，跳过格式化步骤"
-        log "INFO" "现有目录内容: $(ls -la /data/hdfs/journalnode/min-hadoop/ 2>/dev/null || echo 'directory empty')"
-      fi
       log "INFO" "启动JournalNode服务"
       log "INFO" "JournalNode将在端口8480提供HTTP服务，8485提供RPC服务"
       "${HADOOP_HOME}/bin/hdfs" journalnode
@@ -239,15 +218,26 @@ data:
           log "INFO" "使用KUBECONFIG: ${KUBECONFIG}"
           log "INFO" "检查kubectl权限: $(kubectl auth can-i get pods -n ${NAMESPACE} 2>/dev/null || echo 'permission denied')"
           log "INFO" "检查kubectl配置: $(kubectl config view --minify 2>/dev/null | grep -E '(server|namespace)' || echo 'no config')"
-          while sleep 5; do
+          local fail_count=0
+          while true; do
             local STATE=$("${HADOOP_HOME}/bin/hdfs" haadmin -getServiceState "${NN_ID}" 2>/dev/null)
             if [ -z "${STATE}" ]; then
+              ((fail_count++))
+              if [ $fail_count -ge 10 ]; then
+                log "ERROR" "连续10次获取NN状态失败，退出监控循环"
+                break
+              fi
+              sleep 30
               continue
             fi
+            fail_count=0  # 重置失败计数
             if [ "${STATE}" = "${ACTIVE}" ]; then
               if ! kubectl get pod "${POD_NAME}" -n "${NAMESPACE}" -l "${LABEL_KEY}=${ACTIVE}" --no-headers &>/dev/null; then
-                kubectl patch pod "${POD_NAME}" -n "${NAMESPACE}" -p '{"metadata":{"labels":{"'${LABEL_KEY}'":"'${ACTIVE}'"}}}' --timeout="${KUBECTL_TIMEOUT}" &>/dev/null
-                log "INFO" "已自动打标签: ${LABEL_KEY}=${ACTIVE}"
+                if ! kubectl patch pod "${POD_NAME}" -n "${NAMESPACE}" -p '{"metadata":{"labels":{"'${LABEL_KEY}'":"'${ACTIVE}'"}}}' --timeout="${KUBECTL_TIMEOUT}" &>/dev/null; then
+                  log "WARN" "kubectl patch 失败，将在下次循环重试"
+                else
+                  log "INFO" "已自动打标签: ${LABEL_KEY}=${ACTIVE}"
+                fi
               fi
             else
               # standby时移除active标签
@@ -256,6 +246,7 @@ data:
                 log "INFO" "已自动移除标签: ${LABEL_KEY}"
               fi
             fi
+            sleep 30  # 增加间隔以减少资源消耗
           done
         }
         monitor_nn_state &

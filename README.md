@@ -305,50 +305,6 @@ image:
   pullPolicy: "Always"
 ```
 
-```yaml
-# 基本配置
-logLevel: INFO
-antiAffinity: "soft"
-
-# HDFS 配置
-hdfs:
-  clusterName: "min-hadoop"
-  rpcAddress: "min-hadoop"
-  nameNode:
-    replicas: 2
-  dataNode:
-    replicas: 3
-  journalNode:
-    replicas: 3
-  replication: 3
-  webhdfs:
-    enabled: false
-
-# 持久化存储配置
-persistence:
-  nameNode:
-    enabled: true
-    size: "10Gi"
-    accessMode: "ReadWriteOnce"
-    storageClass: "local-storage"
-  dataNode:
-    enabled: true
-    size: "20Gi"
-    accessMode: "ReadWriteOnce"
-    storageClass: "local-storage"
-  journalNode:
-    enabled: true
-    size: "5Gi"
-    accessMode: "ReadWriteOnce"
-    storageClass: "local-storage"
-
-# 镜像配置
-image:
-  repository: hadoop-xxt
-  tag: "3.3.6"
-  pullPolicy: IfNotPresent
-```
-
 ## 支持矩阵
 
 | 功能                     | 支持状态 | 说明                                                                 |
@@ -362,6 +318,10 @@ image:
 | 跨可用区部署             | ❌ 不支持  | 所有节点部署在同一区域                                             |
 | 监控集成                 | ⚠️ 部分支持 | 暴露JMX指标，需自行配置监控系统                                    |
 | 多版本Hadoop支持         | ⚠️ 部分支持 | 仅测试3.3.6版本                                                    |
+
+## 变更日志
+- v1.1.0: 添加 JournalNode 支持，优化 HA 配置，移除无效 JN 格式化逻辑。
+- v1.0.0: 初始版本，支持基本 HDFS 部署。
 
 ## 故障排除指南
 

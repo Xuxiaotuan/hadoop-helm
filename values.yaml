@@ -4,7 +4,7 @@ antiAffinity: "soft"  # 最简单部署，不考虑强分布
 
 # 格式化控制参数
 formatting:
-  forceFormatJournalNode: true  # 是否强制重新格式化 JournalNode
+  forceFormatJournalNode: false  # 禁用 JN 强制格式化（无效命令）
   forceFormatNameNode: true     # 是否强制重新格式化 NameNode
   forceFormatDataNode: true     # 是否强制重新格式化 DataNode
 
